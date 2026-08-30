@@ -420,6 +420,9 @@ tbody td{padding:12px 16px;white-space:nowrap;}
     <button class="btn btn-pri" style="width:100%;justify-content:center;font-size:13px;padding:10px;" onclick="document.getElementById('file-input').click()">
       📂 Browse for File
     </button>
+    <button class="btn btn-ghost" id="btn-back-home" style="display:none;width:100%;justify-content:center;font-size:13px;padding:10px;margin-top:10px;" onclick="goHome()">
+      ⬅️ Back to Home / Dashboard
+    </button>
     <p style="margin-top:14px;font-size:11px;color:var(--text-3);">Attempting auto-load from workspace directory…</p>
   </div>
 </div>
@@ -500,10 +503,11 @@ tbody td{padding:12px 16px;white-space:nowrap;}
       <div class="up-wrap">
         <div class="sec-hdr"><div><h2>Validate Marks Sheet</h2><p>Paste or upload a JSON marks sheet to check for row rejections and exact reasons</p></div></div>
         <div class="up-card">
-          <h3>Paste JSON</h3>
+          <h3>Paste JSON or Load Test Samples</h3>
           <textarea class="paste-ta" id="paste-ta" placeholder='Paste case JSON here…&#10;Supports single case {"students":[…]} or full file {"cases":[…]}'></textarea>
-          <div style="display:flex;gap:10px;margin-top:12px;">
+          <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
             <button class="btn btn-pri" onclick="validatePasted()">🔍 Validate Marks</button>
+            <button class="btn btn-ghost" onclick="loadAdversarialSample()" style="border-color:var(--amber);color:var(--amber);">⚠️ Load Malicious / Adversarial Sample</button>
             <button class="btn btn-ghost" onclick="document.getElementById('paste-ta').value='';document.getElementById('val-out').innerHTML=''">Clear</button>
           </div>
         </div>
@@ -780,6 +784,18 @@ function initApp(json) {
   switchTab('dashboard');
 }
 
+function goHome() {
+  if (!APP.cases.length) return;
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('nav').style.display = 'block';
+  document.getElementById('btn-load').style.display = 'flex';
+  document.getElementById('btn-print').style.display = 'flex';
+  if (APP.cases.length > 1) {
+    document.getElementById('cs-wrap').style.display = 'flex';
+  }
+}
+
 function resetApp() {
   document.getElementById('load-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -788,6 +804,11 @@ function resetApp() {
   document.getElementById('btn-load').style.display = 'none';
   document.getElementById('btn-print').style.display = 'none';
   document.getElementById('file-input').value = '';
+  if (APP.cases.length > 0) {
+    document.getElementById('btn-back-home').style.display = 'flex';
+  } else {
+    document.getElementById('btn-back-home').style.display = 'none';
+  }
 }
 
 /* ╔═══════════════════════════════════════════════════════╗
@@ -1260,13 +1281,82 @@ function switchTab(name) {
 }
 
 /* ─── VALIDATION / IMPORT ─── */
+/* =======================================================
+   SECURITY & SANITIZATION
+======================================================= */
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  if (typeof str !== 'string') str = String(str);
+  return str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[tag] || tag));
+}
+
+/* =======================================================
+   VALIDATION & MALICIOUS CASE HANDLING
+======================================================= */
+function loadAdversarialSample() {
+  const sample = {
+    "case_id": "MALICIOUS-TEST-01",
+    "subjects": [
+      {"code": "BAN", "name": "Bangla", "practical": false},
+      {"code": "ENG", "name": "English", "practical": false},
+      {"code": "MAT", "name": "Mathematics", "practical": false},
+      {"code": "PHY", "name": "Physics", "practical": true},
+      {"code": "CHE", "name": "Chemistry", "practical": true},
+      {"code": "BIO", "name": "Biology", "practical": true},
+      {"code": "HMT", "name": "Higher Mathematics", "practical": true}
+    ],
+    "compulsory": ["BAN", "ENG", "MAT", "PHY", "CHE", "BIO"],
+    "students": [
+      {
+        "id": "M001",
+        "name": "<script>alert('XSS_ATTACK')<\\/script>",
+        "class": "<img src=x onerror=alert(1)>",
+        "optional": "HMT",
+        "marks": {"BAN": 80, "ENG": 75, "MAT": 90, "PHY": {"theory": 50, "practical": 20}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}}
+      },
+      {
+        "id": "M002",
+        "name": "Excessive Marks Student",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": 150, "ENG": 75, "MAT": 90, "PHY": {"theory": 95, "practical": 40}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}}
+      },
+      {
+        "id": "M003",
+        "name": "Negative & Invalid Type Student",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": -10, "ENG": "eighty", "MAT": 90, "PHY": {"theory": "fifty", "practical": -5}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}}
+      },
+      {
+        "id": "M004",
+        "name": "Missing Required Fields Student",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": 80, "ENG": 70}
+      },
+      {
+        "id": "M005",
+        "name": "Unknown Subject Injection",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": 80, "ENG": 75, "MAT": 90, "PHY": {"theory": 50, "practical": 20}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}, "HACK": 100}
+      }
+    ]
+  };
+  document.getElementById('paste-ta').value = JSON.stringify(sample, null, 2);
+  validatePasted();
+}
+
 function validatePasted() {
   const raw=document.getElementById('paste-ta').value.trim();
   if(!raw) return;
   let json;
   try{ json=JSON.parse(raw); } catch(e){
     document.getElementById('val-out').innerHTML=
-      `<div class="rej-list"><div class="rej-hdr">⛔ JSON Syntax Error</div><div class="rej-item"><div class="ri-r">${e.message}</div></div></div>`;
+      `<div class="rej-list"><div class="rej-hdr">⛔ JSON Syntax Error</div><div class="rej-item"><div class="ri-r">${escapeHTML(e.message)}</div></div></div>`;
     return;
   }
 
@@ -1283,44 +1373,56 @@ function validatePasted() {
   const rejected=[], accepted=[];
 
   for(const cobj of cases){
-    const cid=cobj.case_id||'Case';
+    const cid=escapeHTML(cobj.case_id||'Case');
     const sm={};
     if(cobj.subjects) for(const s of cobj.subjects) sm[s.code]=s;
     const comp=cobj.compulsory||[];
     const studs=cobj.students||[];
 
     for(const stu of studs){
-      const sid=stu.id||'?';
-      const sname=stu.name||'Unknown';
+      const sid=escapeHTML(stu.id||'?');
+      const sname=escapeHTML(stu.name||'Unknown');
       const errs=[];
 
+      // Security check: prototype pollution attempt
+      if(stu.__proto__ !== Object.prototype) errs.push("Security Alert: Prototype pollution key detected");
       if(!stu.id) errs.push("Missing 'id'");
       if(!stu.name) errs.push("Missing 'name'");
       if(!stu.class) errs.push("Missing 'class'");
       if(!stu.optional) errs.push("Missing 'optional'");
+
+      // Sanitization notice if HTML characters detected in fields
+      if(stu.name && /[<>]/.test(stu.name)) errs.push("Malicious input warning: HTML/Script tags detected in 'name' (Sanitized/Escaped)");
+      if(stu.class && /[<>]/.test(stu.class)) errs.push("Malicious input warning: HTML/Script tags detected in 'class' (Sanitized/Escaped)");
+
       if(!stu.marks){ errs.push("Missing 'marks'"); }
       else {
         for(const [code,mark] of Object.entries(stu.marks)){
+          if(code === 'hacked' || code === 'HACK' || !(code in sm)) {
+            errs.push(`Unknown/Unrecognized subject code '${escapeHTML(code)}'`);
+            continue;
+          }
           if(mark==='AB') continue;
           const meta=sm[code];
           if(meta?.practical){
             if(typeof mark!=='object'||mark===null)
-              errs.push(`${code}: expected object {theory, practical}, got ${JSON.stringify(mark)}`);
+              errs.push(`${code}: expected object {theory, practical}, got ${escapeHTML(JSON.stringify(mark))}`);
             else{
-              if(mark.theory===undefined) errs.push(`${code}: missing theory mark`);
-              else if(mark.theory<0||mark.theory>75) errs.push(`${code}: theory mark ${mark.theory} out of range 0–75`);
-              if(mark.practical===undefined) errs.push(`${code}: missing practical mark`);
-              else if(mark.practical<0||mark.practical>25) errs.push(`${code}: practical mark ${mark.practical} out of range 0–25`);
+              if(typeof mark.theory !== 'number') errs.push(`${code}: theory mark must be a number (got ${escapeHTML(JSON.stringify(mark.theory))})`);
+              else if(mark.theory<0||mark.theory>75) errs.push(`${code}: theory mark ${mark.theory} out of valid range 0–75`);
+              
+              if(typeof mark.practical !== 'number') errs.push(`${code}: practical mark must be a number (got ${escapeHTML(JSON.stringify(mark.practical))})`);
+              else if(mark.practical<0||mark.practical>25) errs.push(`${code}: practical mark ${mark.practical} out of valid range 0–25`);
             }
           } else {
-            if(typeof mark!=='number') errs.push(`${code}: expected numeric mark, got ${JSON.stringify(mark)}`);
-            else if(mark<0||mark>100) errs.push(`${code}: mark ${mark} out of range 0–100`);
+            if(typeof mark!=='number') errs.push(`${code}: expected numeric mark, got ${escapeHTML(JSON.stringify(mark))}`);
+            else if(mark<0||mark>100) errs.push(`${code}: total mark ${mark} out of valid range 0–100`);
           }
         }
         if(stu.optional&&!(stu.optional in stu.marks))
-          errs.push(`Optional subject '${stu.optional}' has no mark entry`);
+          errs.push(`Optional subject '${escapeHTML(stu.optional)}' has no mark entry`);
         for(const code of comp)
-          if(!(code in stu.marks)) errs.push(`Missing mark for compulsory subject '${code}'`);
+          if(!(code in stu.marks)) errs.push(`Missing mark for compulsory subject '${escapeHTML(code)}'`);
       }
 
       if(errs.length) rejected.push({id:`${cid}/${sid}`,name:sname,errs});
