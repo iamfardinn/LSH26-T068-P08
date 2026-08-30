@@ -278,7 +278,8 @@ tbody td{padding:12px 16px;white-space:nowrap;}
   font-family:'JetBrains Mono',monospace;font-size:11.5px;
 }
 .calc-box .c-lbl{font-family:'Inter',sans-serif;font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;font-weight:700;}
-.cl{margin:3px 0;color:var(--text-2);}
+.cl{margin:3px 0;color:var(--text-2);white-space:pre-wrap;}
+
 .cl.tot{border-top:1px solid var(--border);padding-top:8px;margin-top:8px;font-weight:700;color:var(--text-1);}
 .cl.unc{color:var(--text-3);text-decoration:line-through;}
 .cl.err{color:var(--red);margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-family:'Inter',sans-serif;}
@@ -423,7 +424,11 @@ tbody td{padding:12px 16px;white-space:nowrap;}
     <button class="btn btn-ghost" id="btn-back-home" style="display:none;width:100%;justify-content:center;font-size:13px;padding:10px;margin-top:10px;" onclick="goHome()">
       ⬅️ Back to Home / Dashboard
     </button>
-    <p style="margin-top:14px;font-size:11px;color:var(--text-3);">Attempting auto-load from workspace directory…</p>
+<button class="btn btn-ghost" id="btn-builtin" style="display:none;width:100%;justify-content:center;font-size:13px;padding:10px;margin-top:10px;" onclick="loadBuiltIn()">
+      📚 Use built-in dataset (60 students, 2 classes)
+    </button>
+    <p id="load-status" style="margin-top:14px;font-size:11px;color:var(--text-3);">Looking for a marks file next to this page…</p>
+
   </div>
 </div>
 
@@ -461,6 +466,8 @@ tbody td{padding:12px 16px;white-space:nowrap;}
             <option value="absent">Has AB</option>
             <option value="prac">Practical Fail</option>
             <option value="opt">Optional ≤ 2.0</option>
+<option value="data">Data Problem</option>
+
           </select>
         </div>
         <div style="overflow-x:auto;">
@@ -551,6 +558,21 @@ tbody td{padding:12px 16px;white-space:nowrap;}
 
 <script>
 /* ╔═══════════════════════════════════════════════════════╗
+║  OUTPUT ENCODING                                      ║
+   ║  Every value that originates in the input file must   ║
+   ║  pass through esc() before it reaches innerHTML —     ║
+   ║  render paths included, not just the validator.       ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  if (typeof str !== 'string') str = String(str);
+  return str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[tag] || tag));
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+
    ║  RULES ENGINE                                         ║
    ╚═══════════════════════════════════════════════════════╝ */
 
@@ -584,11 +606,42 @@ function gpRange(total) {
   return "< 33 → GP 0.0 (Fail)";
 }
 
+/* ── Input integrity (D-rules) ────────────────────────────
+   The processing path applies the SAME checks as the validation
+   tab, so a malformed file can never be graded silently.
+     D-1  mark absent from the file      → GP 0, flagged, F if compulsory
+     D-2  mark of the wrong type         → GP 0, flagged, F if compulsory
+     D-3  mark outside its legal range   → clamped to range, flagged
+     D-4  subject code not in the schema → ignored, flagged
+──────────────────────────────────────────────────────── */
+function isNum(v) { return typeof v === 'number' && isFinite(v); }
+function clampTo(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function dataErrorResult(code, subjectType, isOptional, issues, shown) {
+  return {
+    code, absent: false, dataError: true, gp: 0,
+    total: null, theory: null, practical: null,
+    fail: true, practicalFail: false, theoryFail: false,
+    issues,
+    failReason: issues.join('; '),
+    rule: `D: unusable mark (${shown}) → GP 0.0${isOptional ? '; contributes 0 to GPA' : '; overall result = F'} — office must supply a valid mark before publishing`
+  };
+}
+
 /**
  * Process a single subject mark.
+ * `present` is false when the student's marks object has no entry for this code.
  */
-function processSubject(code, mark, meta, isOptional) {
+function processSubject(code, mark, meta, isOptional, present = true) {
   const subjectType = isOptional ? "optional" : "compulsory";
+  const issues = [];
+
+  // MISSING MARK (D-1)
+  if (!present || mark === undefined || mark === null) {
+    return dataErrorResult(code, subjectType, isOptional,
+      [`No mark supplied for ${subjectType} subject ${code}`], 'missing');
+  }
+
 
   // ABSENT (R-12)
   if (mark === "AB") {
@@ -596,6 +649,8 @@ function processSubject(code, mark, meta, isOptional) {
       code, absent: true, gp: 0,
       total: null, theory: null, practical: null,
       fail: true, practicalFail: false, theoryFail: false,
+issues: [],
+
       failReason: "Absent (AB)",
       rule: `R-12: Absent in ${subjectType} subject → GP 0.0${isOptional ? '; contributes 0 to GPA' : '; overall result = F'}`
     };
@@ -603,11 +658,34 @@ function processSubject(code, mark, meta, isOptional) {
 
   // PRACTICAL SUBJECT (R-11)
   if (meta && meta.practical) {
-    const T = mark.theory;
-    const P = mark.practical;
+if (typeof mark !== 'object' || Array.isArray(mark)) {
+      return dataErrorResult(code, subjectType, isOptional,
+        [`${code}: expected {theory, practical}, got ${JSON.stringify(mark)}`], JSON.stringify(mark));
+    }
+    let T = mark.theory, P = mark.practical;
+    if (!isNum(T) || !isNum(P)) {
+      const bad = [];
+      if (!isNum(T)) bad.push(`theory ${JSON.stringify(mark.theory)} is not a number`);
+      if (!isNum(P)) bad.push(`practical ${JSON.stringify(mark.practical)} is not a number`);
+      return dataErrorResult(code, subjectType, isOptional,
+        bad.map(b => `${code}: ${b}`), JSON.stringify(mark));                       // D-2
+    }
+    if (T < 0 || T > 75) {                                                          // D-3
+      const c = clampTo(T, 0, 75);
+      issues.push(`${code}: theory ${T} outside 0–75, clamped to ${c}`);
+      T = c;
+    }
+    if (P < 0 || P > 25) {
+      const c = clampTo(P, 0, 25);
+      issues.push(`${code}: practical ${P} outside 0–25, clamped to ${c}`);
+      P = c;
+    }
+
     const total = T + P;
     const tFail = T < 25;
     const pFail = P < 8;
+    const clampNote = issues.length ? ` [${issues.join('; ')}]` : '';
+
 
     if (tFail || pFail) {
       const gpIfPassed = markToGP(total);
@@ -618,9 +696,10 @@ function processSubject(code, mark, meta, isOptional) {
         code, absent: false, gp: 0,
         total, theory: T, practical: P,
         fail: true, practicalFail: pFail, theoryFail: tFail,
-        gpIfPassed,
+gpIfPassed, issues,
         failReason: failReason.join(' AND '),
-        rule: `R-11: Both parts must pass independently. Failed ${failReason.join('; ')} → GP 0.0 (total mark ${total} would give GP ${gpIfPassed.toFixed(1)} if passed)`
+        rule: `R-11: Both parts must pass independently. Failed ${failReason.join('; ')} → GP 0.0 (total mark ${total} would give GP ${gpIfPassed.toFixed(1)} if passed)${clampNote}`
+
       };
     }
 
@@ -628,20 +707,32 @@ function processSubject(code, mark, meta, isOptional) {
     return {
       code, absent: false, gp,
       total, theory: T, practical: P,
-      fail: false, practicalFail: false, theoryFail: false,
-      rule: `R-11+R-10: theory ${T}/75 ✓ (≥25), practical ${P}/25 ✓ (≥8); total mark ${total} → ${gpRange(total)}`
+fail: false, practicalFail: false, theoryFail: false, issues,
+      rule: `R-11+R-10: theory ${T}/75 ✓ (≥25), practical ${P}/25 ✓ (≥8); total mark ${total} → ${gpRange(total)}${clampNote}`
+
     };
   }
 
   // THEORY-ONLY SUBJECT (R-10)
-  const total = mark;
+if (!isNum(mark)) {                                                               // D-2
+    return dataErrorResult(code, subjectType, isOptional,
+      [`${code}: expected a number out of 100, got ${JSON.stringify(mark)}`], JSON.stringify(mark));
+  }
+  let total = mark;
+  if (total < 0 || total > 100) {                                                   // D-3
+    const c = clampTo(total, 0, 100);
+    issues.push(`${code}: mark ${total} outside 0–100, clamped to ${c}`);
+    total = c;
+  }
+
   const gp = markToGP(total);
   return {
     code, absent: false, gp,
     total, theory: null, practical: null,
     fail: gp === 0,
-    practicalFail: false, theoryFail: false,
-    rule: `R-10: mark ${total}/100 → ${gpRange(total)}`
+practicalFail: false, theoryFail: false, issues,
+    rule: `R-10: mark ${total}/100 → ${gpRange(total)}${issues.length ? ` [${issues.join('; ')}]` : ''}`
+
   };
 }
 
@@ -650,11 +741,30 @@ function processSubject(code, mark, meta, isOptional) {
  */
 function processStudent(student, subjectMap, compulsory) {
   const optCode = student.optional;
+const marks = (student.marks && typeof student.marks === 'object') ? student.marks : {};
   const subjectResults = {};
+  const dataIssues = [];
 
-  for (const [code, mark] of Object.entries(student.marks)) {
+  // Grade exactly the subjects the schema expects: the six compulsory + the
+  // declared optional. Anything else in the file is reported, never graded (D-4).
+  const expected = [...compulsory];
+  if (optCode && !expected.includes(optCode)) expected.push(optCode);
+  if (!optCode) dataIssues.push('No optional subject declared for this student');
+
+  for (const code of expected) {
     const meta = subjectMap[code] || { code, name: code, practical: false };
-    subjectResults[code] = processSubject(code, mark, meta, code === optCode);
+    if (!subjectMap[code]) dataIssues.push(`Subject '${code}' is not declared in the case schema`);
+    const present = Object.prototype.hasOwnProperty.call(marks, code);
+    const r = processSubject(code, marks[code], meta, code === optCode, present);
+    subjectResults[code] = r;
+    if (r.issues && r.issues.length) dataIssues.push(...r.issues);
+  }
+
+  for (const code of Object.keys(marks)) {
+    if (!expected.includes(code)) {
+      dataIssues.push(`Mark supplied for '${code}', which is neither compulsory nor this student's optional — ignored`); // D-4
+    }
+
   }
 
   // Compulsory sum and failure detection
@@ -692,15 +802,21 @@ function processStudent(student, subjectMap, compulsory) {
   const onOptList  = optGP <= 2.0;
   const onPracList = Object.values(subjectResults).some(r => r.practicalFail);
   const onAbList   = Object.values(subjectResults).some(r => r.absent);
+const onDataList = dataIssues.length > 0;
 
   return {
     ...student,
-    subjectResults,
+    id: String(student.id ?? '—'),
+    name: String(student.name ?? 'Unknown'),
+    class: String(student.class ?? 'Unassigned'),
+    subjectResults, dataIssues,
+
     compSum, compFail, compFailCodes,
     optGP, optContrib,
     rawGPA, cappedGPA, uncancelledGPA,
     finalGPA, letterGrade,
-    onOptList, onPracList, onAbList
+onOptList, onPracList, onAbList, onDataList
+
   };
 }
 
@@ -773,7 +889,8 @@ function initApp(json) {
   if (APP.cases.length > 1) {
     cw.style.display = 'flex';
     cs.innerHTML = APP.cases.map((c,i) =>
-      `<option value="${i}">${c.case_id||'Case '+(i+1)} (${c.students.length} students)</option>`
+`<option value="${i}">${esc(c.case_id||'Case '+(i+1))} (${c.students.length} students)</option>`
+
     ).join('');
     cs.onchange = () => { APP.idx = +cs.value; renderAll(); };
   } else {
@@ -833,7 +950,8 @@ function renderDash() {
   const gpas = students.filter(s=>s.letterGrade!=='F').map(s=>s.finalGPA);
   const avgGPA = gpas.length ? (gpas.reduce((a,b)=>a+b,0)/gpas.length).toFixed(2) : '0.00';
   const aPlus = students.filter(s=>s.letterGrade==='A+').length;
-  const needsChk = students.filter(s=>s.onOptList||s.onPracList||s.onAbList).length;
+const needsChk = students.filter(s=>s.onOptList||s.onPracList||s.onAbList||s.onDataList).length;
+
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card" style="--ca:var(--cyan);">
@@ -888,7 +1006,8 @@ function renderDash() {
     const bw=((n/mxF)*100).toFixed(1);
     const pct=((n/total)*100).toFixed(0);
     return `<div class="sf-row">
-      <div class="sf-name">${name}</div>
+<div class="sf-name">${esc(name)}</div>
+
       <div class="sf-track"><div class="sf-fill" style="width:${bw}%;">${bw>20?`${n} (${pct}%)`:''}</div></div>
       <div class="sf-cnt">${n}</div>
     </div>`;
@@ -914,7 +1033,8 @@ function renderStudents() {
   const classes = [...new Set(c.processed.map(s=>s.class))].sort();
   const cf = document.getElementById('q-class');
   cf.innerHTML = '<option value="">All Classes</option>' +
-    classes.map(cl=>`<option value="${cl}">${cl}</option>`).join('');
+classes.map(cl=>`<option value="${esc(cl)}">${esc(cl)}</option>`).join('');
+
   APP.filtered = [...c.processed];
   APP.sortField='id'; APP.sortDir=1;
   renderTable();
@@ -937,6 +1057,8 @@ function filterStudents() {
     if(fl==='absent' && !s.onAbList) return false;
     if(fl==='prac' && !s.onPracList) return false;
     if(fl==='opt' && !s.onOptList) return false;
+if(fl==='data' && !s.onDataList) return false;
+
     return true;
   });
   renderTable();
@@ -972,6 +1094,8 @@ function renderTable() {
     if(s.onAbList) flags.push('<span class="tag t-warn">AB</span>');
     if(s.onPracList) flags.push('<span class="tag t-warn">P-FAIL</span>');
     if(s.onOptList) flags.push('<span class="tag t-info">OPT≤2</span>');
+if(s.onDataList) flags.push('<span class="tag t-fail">DATA</span>');
+
 
     const optR=s.subjectResults[s.optional];
     let optCell='—';
@@ -981,11 +1105,12 @@ function renderTable() {
       else optCell=`<span style="font-family:'JetBrains Mono',monospace;font-size:11px;">${optR.gp.toFixed(1)}</span>`;
     }
 
-    return `<tr onclick="openModal('${s.id}')">
-      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);">${s.id}</span></td>
-      <td><span style="font-weight:500;">${s.name}</span></td>
-      <td><span style="font-size:11px;color:var(--text-2);">${s.class}</span></td>
-      <td><span style="font-size:11px;color:var(--text-3);">${s.optional}</span></td>
+return `<tr data-sid="${esc(s.id)}" onclick="openModal(this.dataset.sid)">
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);">${esc(s.id)}</span></td>
+      <td><span style="font-weight:500;">${esc(s.name)}</span></td>
+      <td><span style="font-size:11px;color:var(--text-2);">${esc(s.class)}</span></td>
+      <td><span style="font-size:11px;color:var(--text-3);">${esc(s.optional)}</span></td>
+
       ${gpCell(s,'BAN')}${gpCell(s,'ENG')}${gpCell(s,'MAT')}
       ${gpCell(s,'PHY')}${gpCell(s,'CHE')}${gpCell(s,'BIO')}
       <td>${optCell}</td>
@@ -1028,6 +1153,8 @@ function openModal(id) {
   if(s.onPracList) flags.push(`<span class="fp fp-warn">⚡ Practical component failed (R-11)</span>`);
   if(s.onAbList)   flags.push(`<span class="fp fp-warn">📋 Absent in subject (R-12)</span>`);
   if(s.onOptList)  flags.push(`<span class="fp fp-info">ℹ️ Optional GP ${s.optGP.toFixed(1)} ≤ 2.0 — bonus +${s.optContrib.toFixed(1)} (R-13)</span>`);
+if(s.onDataList) flags.push(`<span class="fp fp-fail">🛠️ Input problem: ${s.dataIssues.map(i=>esc(i)).join(' · ')}</span>`);
+
   if(!s.compFail&&s.rawGPA>5.00) flags.push(`<span class="fp fp-info">✨ GPA capped at 5.00 (R-13)</span>`);
   if(!flags.length) flags.push(`<span class="fp fp-ok">✅ Clean result — all requirements met</span>`);
 
@@ -1060,13 +1187,15 @@ function openModal(id) {
     const rowCls=r.absent?'tr-ab':r.fail?'tr-fail':isOpt?'tr-opt':'';
     return `<tr class="${rowCls}">
       <td>
-        <span class="t-code">${code}</span>
-        <br><span style="font-size:10px;color:var(--text-3);">${meta?.name||code}</span>
+<span class="t-code">${esc(code)}</span>
+        <br><span style="font-size:10px;color:var(--text-3);">${esc(meta?.name||code)}</span>
+
       </td>
       <td>${isOpt?'<span style="color:var(--cyan);font-size:11px;font-weight:600;">⭐ Optional</span>':'<span style="font-size:11px;color:var(--text-3);">✔ Compulsory</span>'}</td>
       <td>${markCell}</td>
       <td>${gpCell}</td>
-      <td><span class="t-rule">${r.rule}</span></td>
+<td><span class="t-rule">${esc(r.rule)}</span></td>
+
     </tr>`;
   }).join('');
 
@@ -1076,7 +1205,9 @@ function openModal(id) {
     const name=c.subjectMap[code]?.name||code;
     const gp=r?r.gp.toFixed(1):'0.0';
     const note=r?.absent?' ← <span style="color:var(--amber);">ABSENT</span>':r?.fail?' ← <span style="color:var(--red);">FAIL</span>':'';
-    return `<div class="cl">${name.padEnd(18,' ')} : ${gp.padStart(4,' ')}${note}</div>`;
+// pad first, escape second — escaping changes length, so the order matters
+    return `<div class="cl">${esc(name.padEnd(18,' '))} : ${gp.padStart(4,' ')}${note}</div>`;
+
   }).join('');
 
   const optName=c.subjectMap[s.optional]?.name||s.optional;
@@ -1118,14 +1249,16 @@ function openModal(id) {
       <div class="${s.compFail?'unc':''}">
         ${compLines}
         <div class="cl" style="color:var(--cyan);">
-          Optional bonus (${optName}) : +${s.optContrib.toFixed(1)} &nbsp;
+Optional bonus (${esc(optName)}) : +${s.optContrib.toFixed(1)} &nbsp;
+
           [max(0, ${s.optGP.toFixed(1)} − 2.0) = ${s.optContrib.toFixed(1)}]
         </div>
         <div class="cl tot">Compulsory Sum + Bonus = ${s.compSum.toFixed(1)} + ${s.optContrib.toFixed(1)} = ${(s.compSum+s.optContrib).toFixed(1)}</div>
         <div class="cl tot">Raw Average = ${(s.compSum+s.optContrib).toFixed(1)} / 6 = ${s.rawGPA.toFixed(6)}</div>
         <div class="cl tot">Capped Average = min(5.00, ${s.rawGPA.toFixed(4)}) = ${s.cappedGPA.toFixed(2)}</div>
       </div>
-      ${s.compFail?`<div class="cl err">❌ R-13 Override: Compulsory subject failure in [${s.compFailCodes.join(', ')}] → Final GPA forced to 0.00, Letter Grade = F. Uncancelled average of ${s.uncancelledGPA.toFixed(2)} is shown in audit trace for office review.</div>`:''}
+${s.compFail?`<div class="cl err">❌ R-13 Override: Compulsory subject failure in [${esc(s.compFailCodes.join(', '))}] → Final GPA forced to 0.00, Letter Grade = F. Uncancelled average of ${s.uncancelledGPA.toFixed(2)} is shown in audit trace for office review.</div>`:''}
+
     </div>
   `;
 
@@ -1144,15 +1277,18 @@ function renderChecking() {
   const optList=students.filter(s=>s.onOptList);
   const pracList=students.filter(s=>s.onPracList);
   const abList=students.filter(s=>s.onAbList);
+const dataList=students.filter(s=>s.onDataList);
+
 
   function buildList(items, reasonFn) {
     if(!items.length) return '<div class="empty"><div class="ei">✅</div><p>No students on this list</p></div>';
     return items.map(s=>{
       const gCls=s.letterGrade==='A+'?'gA\\+':s.letterGrade==='A-'?'gA-':'g'+s.letterGrade;
-      return `<div class="ck-item" onclick="openModal('${s.id}')">
-        <div class="ck-id">${s.id}</div>
+return `<div class="ck-item" data-sid="${esc(s.id)}" onclick="openModal(this.dataset.sid)">
+        <div class="ck-id">${esc(s.id)}</div>
         <div class="ck-info">
-          <div class="ck-name">${s.name} <span style="font-size:11px;color:var(--text-3);">${s.class}</span></div>
+          <div class="ck-name">${esc(s.name)} <span style="font-size:11px;color:var(--text-3);">${esc(s.class)}</span></div>
+
           <div class="ck-why">${reasonFn(s)}</div>
         </div>
         <span class="gb ${gCls}" style="font-size:10px;min-width:28px;height:28px;">${s.letterGrade}</span>
@@ -1166,7 +1302,8 @@ function renderChecking() {
       <div class="ck-body">${buildList(optList,s=>{
         const r=s.subjectResults[s.optional];
         const name=CC().subjectMap[s.optional]?.name||s.optional;
-        return r?.absent?`${name}: Absent (AB) — contributes +0.00`:`${name}: GP ${s.optGP.toFixed(1)} ≤ 2.0 — bonus +0.00 (no benefit)`;
+return r?.absent?`${esc(name)}: Absent (AB) — contributes +0.00`:`${esc(name)}: GP ${s.optGP.toFixed(1)} ≤ 2.0 — bonus +0.00 (no benefit)`;
+
       })}</div>
     </div>
     <div class="ck-card">
@@ -1174,7 +1311,8 @@ function renderChecking() {
       <div class="ck-body">${buildList(pracList,s=>{
         const fp=Object.entries(s.subjectResults)
           .filter(([,r])=>r.practicalFail)
-          .map(([code,r])=>`${CC().subjectMap[code]?.name||code} (P: ${r.practical}/25 < 8)`);
+.map(([code,r])=>`${esc(CC().subjectMap[code]?.name||code)} (P: ${r.practical}/25 < 8)`);
+
         return `Practical fail in: ${fp.join('; ')}`;
       })}</div>
     </div>
@@ -1183,10 +1321,17 @@ function renderChecking() {
       <div class="ck-body">${buildList(abList,s=>{
         const ab=Object.entries(s.subjectResults)
           .filter(([,r])=>r.absent)
-          .map(([code])=>CC().subjectMap[code]?.name||code);
+.map(([code])=>esc(CC().subjectMap[code]?.name||code));
         return `Absent mark (AB) in: ${ab.join(', ')}`;
       })}</div>
     </div>
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">🛠️</span><h3>Data Integrity List</h3><div class="ck-cnt">${dataList.length}</div></div>
+      <div class="ck-body">${buildList(dataList,s=>
+        s.dataIssues.map(i=>esc(i)).join('<br>')
+      )}</div>
+    </div>
+
   `;
 }
 
@@ -1211,7 +1356,8 @@ function renderSummary() {
     const pct=((passed/total)*100).toFixed(1);
 
     html+=`<div class="chart-card">
-      <h3>${cls==='All'?'🏫 Overall Performance':'📚 '+cls}
+<h3>${cls==='All'?'🏫 Overall Performance':'📚 '+esc(cls)}
+
         <span style="font-size:11px;font-weight:400;color:var(--text-3);margin-left:8px;">${total} students · ${passRate}% pass rate</span>
       </h3>
       <div class="donut-wrap" style="margin-bottom:20px;">
@@ -1257,7 +1403,8 @@ function renderSummary() {
       const bw=((n/mxF)*100).toFixed(1);
       const pct=((n/students.length)*100).toFixed(1);
       return`<div class="sf-row">
-        <div class="sf-name">${name}</div>
+<div class="sf-name">${esc(name)}</div>
+
         <div class="sf-track"><div class="sf-fill" style="width:${bw}%;">${bw>18?`${n} (${pct}%)`:''}</div></div>
         <div class="sf-cnt">${n}</div>
       </div>`;}).join('')}
@@ -1271,7 +1418,8 @@ function updateBadges() {
   const c=CC();
   document.getElementById('bdg-s').textContent=c.processed.length;
   document.getElementById('bdg-c').textContent=
-    c.processed.filter(s=>s.onOptList||s.onPracList||s.onAbList).length;
+c.processed.filter(s=>s.onOptList||s.onPracList||s.onAbList||s.onDataList).length;
+
 }
 
 /* ─── TAB NAVIGATION ─── */
@@ -1281,8 +1429,7 @@ function switchTab(name) {
 }
 
 /* ─── VALIDATION / IMPORT ─── */
-/* =======================================================
-   SECURITY & SANITIZATION
+/* ================================================   SECURITY & SANITIZATION
 ======================================================= */
 function escapeHTML(str) {
   if (str === null || str === undefined) return '';
@@ -1292,8 +1439,7 @@ function escapeHTML(str) {
   }[tag] || tag));
 }
 
-/* =======================================================
-   VALIDATION & MALICIOUS CASE HANDLING
+/* ================================================   VALIDATION & MALICIOUS CASE HANDLING
 ======================================================= */
 function loadAdversarialSample() {
   const sample = {
@@ -1409,14 +1555,15 @@ function validatePasted() {
               errs.push(`${code}: expected object {theory, practical}, got ${escapeHTML(JSON.stringify(mark))}`);
             else{
               if(typeof mark.theory !== 'number') errs.push(`${code}: theory mark must be a number (got ${escapeHTML(JSON.stringify(mark.theory))})`);
-              else if(mark.theory<0||mark.theory>75) errs.push(`${code}: theory mark ${mark.theory} out of valid range 0–75`);
+else if(mark.theory<0||mark.theory>75) errs.push(`${esc(code)}: theory mark ${esc(mark.theory)} out of valid range 0–75`);
               
               if(typeof mark.practical !== 'number') errs.push(`${code}: practical mark must be a number (got ${escapeHTML(JSON.stringify(mark.practical))})`);
-              else if(mark.practical<0||mark.practical>25) errs.push(`${code}: practical mark ${mark.practical} out of valid range 0–25`);
+              else if(mark.practical<0||mark.practical>25) errs.push(`${esc(code)}: practical mark ${esc(mark.practical)} out of valid range 0–25`);
             }
           } else {
             if(typeof mark!=='number') errs.push(`${code}: expected numeric mark, got ${escapeHTML(JSON.stringify(mark))}`);
-            else if(mark<0||mark>100) errs.push(`${code}: total mark ${mark} out of valid range 0–100`);
+            else if(mark<0||mark>100) errs.push(`${esc(code)}: total mark ${esc(mark)} out of valid range 0–100`);
+
           }
         }
         if(stu.optional&&!(stu.optional in stu.marks))
@@ -1442,7 +1589,8 @@ function validatePasted() {
       <div class="rej-list">
         <div class="rej-hdr">⛔ ${rejected.length} row${rejected.length>1?'s':''} rejected · ${accepted.length} accepted</div>
         ${rejected.map(r=>`<div class="rej-item">
-          <div><span class="ri-id">${r.id}</span> · ${r.name}</div>
+<div><span class="ri-id">${esc(r.id)}</span> · ${esc(r.name)}</div>
+
           ${r.errs.map(e=>`<div class="ri-r">→ ${e}</div>`).join('')}
         </div>`).join('')}
       </div>`;
@@ -1453,11 +1601,12 @@ function validatePasted() {
 function openPrintSelector() {
   const c=CC();
   document.getElementById('plist').innerHTML=c.processed.map(s=>`
-    <div class="ck-item" onclick="printStudent('${s.id}')">
-      <div class="ck-id">${s.id}</div>
+<div class="ck-item" data-sid="${esc(s.id)}" onclick="printStudent(this.dataset.sid)">
+      <div class="ck-id">${esc(s.id)}</div>
       <div class="ck-info">
-        <div class="ck-name">${s.name}</div>
-        <div class="ck-why">${s.class} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div>
+        <div class="ck-name">${esc(s.name)}</div>
+        <div class="ck-why">${esc(s.class)} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div>
+
       </div>
     </div>`).join('');
   document.getElementById('p-modal').classList.add('open');
@@ -1468,9 +1617,10 @@ function filterPrintList(q) {
   const ql=q.toLowerCase();
   document.getElementById('plist').innerHTML=c.processed
     .filter(s=>s.name.toLowerCase().includes(ql)||s.id.toLowerCase().includes(ql))
-    .map(s=>`<div class="ck-item" onclick="printStudent('${s.id}')">
-      <div class="ck-id">${s.id}</div>
-      <div class="ck-info"><div class="ck-name">${s.name}</div><div class="ck-why">${s.class} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div></div>
+.map(s=>`<div class="ck-item" data-sid="${esc(s.id)}" onclick="printStudent(this.dataset.sid)">
+      <div class="ck-id">${esc(s.id)}</div>
+      <div class="ck-info"><div class="ck-name">${esc(s.name)}</div><div class="ck-why">${esc(s.class)} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div></div>
+
     </div>`).join('');
 }
 
@@ -1499,8 +1649,9 @@ function printStudent(id) {
       if(r.fail) noteStr='Failed (mark < 33)';
     }
     return`<tr>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${code}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;">${meta?.name||code}</td>
+<td style="border:1px solid #ccc;padding:6px 8px;">${esc(code)}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;">${esc(meta?.name||code)}</td>
+
       <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${isComp?'Compulsory':'Optional'}</td>
       <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${markStr}</td>
       <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;font-weight:bold;">${gpStr}</td>
@@ -1513,11 +1664,12 @@ function printStudent(id) {
       <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:14px;">
         <div style="font-size:22pt;font-weight:bold;">Bogura Secondary School</div>
         <div style="font-size:12pt;margin:3px 0;">Official Student Academic Marksheet</div>
-        <div style="font-size:10pt;color:#555;">Case Reference: ${c.case_id||'N/A'} · SSC Result Engine</div>
+<div style="font-size:10pt;color:#555;">Case Reference: ${esc(c.case_id||'N/A')} · SSC Result Engine</div>
       </div>
       <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11pt;">
-        <tr><td style="padding:4px 0;width:50%;"><b>Student Name:</b> ${s.name}</td><td><b>Student ID:</b> ${s.id}</td></tr>
-        <tr><td style="padding:4px 0;"><b>Class:</b> ${s.class}</td><td><b>Optional Subject:</b> ${c.subjectMap[s.optional]?.name||s.optional}</td></tr>
+        <tr><td style="padding:4px 0;width:50%;"><b>Student Name:</b> ${esc(s.name)}</td><td><b>Student ID:</b> ${esc(s.id)}</td></tr>
+        <tr><td style="padding:4px 0;"><b>Class:</b> ${esc(s.class)}</td><td><b>Optional Subject:</b> ${esc(c.subjectMap[s.optional]?.name||s.optional)}</td></tr>
+
       </table>
       <table style="width:100%;border-collapse:collapse;font-size:10pt;">
         <thead>
@@ -1551,19 +1703,51 @@ function printStudent(id) {
   window.print();
 }
 
+/* ─── BUILT-IN DATASET ───
+   60 students across Class 9 and Class 10, carrying all four hard edges:
+   a failed subject behind a strong average, a practical fail with a passing
+   theory mark, an optional subject at or below the point where it helps, and
+   students absent in a subject. The app is never empty, even offline. */
+const BUILTIN_CASE = {"case_id":"BUILT-IN-60","subjects":[{"code":"BAN","name":"Bangla","practical":false},{"code":"ENG","name":"English","practical":false},{"code":"MAT","name":"Mathematics","practical":false},{"code":"PHY","name":"Physics","practical":true},{"code":"CHE","name":"Chemistry","practical":true},{"code":"BIO","name":"Biology","practical":true},{"code":"HMT","name":"Higher Mathematics","practical":true},{"code":"AGR","name":"Agriculture","practical":true},{"code":"REL","name":"Religious Studies","practical":false}],"compulsory":["BAN","ENG","MAT","PHY","CHE","BIO"],"students":[{"id":"S001","name":"Jubayer Hossain","class":"Class 9","optional":"HMT","marks":{"BAN":48,"ENG":37,"MAT":55,"PHY":{"theory":36,"practical":8},"CHE":{"theory":34,"practical":14},"BIO":{"theory":35,"practical":14},"HMT":{"theory":30,"practical":12}}},{"id":"S002","name":"Jarin Begum","class":"Class 9","optional":"HMT","marks":{"BAN":69,"ENG":67,"MAT":71,"PHY":{"theory":50,"practical":18},"CHE":{"theory":50,"practical":15},"BIO":{"theory":51,"practical":17},"HMT":{"theory":38,"practical":15}}},{"id":"S003","name":"Priya Ahmed","class":"Class 9","optional":"HMT","marks":{"BAN":54,"ENG":57,"MAT":59,"PHY":{"theory":45,"practical":14},"CHE":{"theory":35,"practical":15},"BIO":{"theory":41,"practical":19},"HMT":{"theory":39,"practical":17}}},{"id":"S004","name":"Rifat Begum","class":"Class 9","optional":"AGR","marks":{"BAN":68,"ENG":52,"MAT":59,"PHY":{"theory":34,"practical":20},"CHE":{"theory":38,"practical":13},"BIO":{"theory":38,"practical":13},"AGR":{"theory":40,"practical":17}}},{"id":"S005","name":"Sanjida Ahmed","class":"Class 9","optional":"HMT","marks":{"BAN":61,"ENG":53,"MAT":68,"PHY":{"theory":40,"practical":13},"CHE":{"theory":41,"practical":13},"BIO":{"theory":49,"practical":15},"HMT":{"theory":44,"practical":13}}},{"id":"S006","name":"Rifat Mia","class":"Class 9","optional":"REL","marks":{"BAN":50,"ENG":69,"MAT":67,"PHY":{"theory":55,"practical":15},"CHE":{"theory":46,"practical":14},"BIO":{"theory":43,"practical":19},"REL":52}},{"id":"S007","name":"Tanvir Sarkar","class":"Class 9","optional":"REL","marks":{"BAN":40,"ENG":52,"MAT":41,"PHY":{"theory":40,"practical":10},"CHE":{"theory":26,"practical":13},"BIO":{"theory":29,"practical":12},"REL":42}},{"id":"S008","name":"Nusrat Chowdhury","class":"Class 9","optional":"HMT","marks":{"BAN":78,"ENG":97,"MAT":96,"PHY":{"theory":69,"practical":22},"CHE":{"theory":51,"practical":19},"BIO":{"theory":61,"practical":19},"HMT":{"theory":59,"practical":22}}},{"id":"S009","name":"Rumana Sarkar","class":"Class 9","optional":"REL","marks":{"BAN":67,"ENG":51,"MAT":64,"PHY":{"theory":52,"practical":19},"CHE":{"theory":36,"practical":14},"BIO":{"theory":34,"practical":18},"REL":67}},{"id":"S010","name":"Mitu Sheikh","class":"Class 9","optional":"REL","marks":{"BAN":64,"ENG":66,"MAT":67,"PHY":{"theory":39,"practical":19},"CHE":{"theory":48,"practical":18},"BIO":{"theory":43,"practical":17},"REL":50}},{"id":"S011","name":"Nadia Karim","class":"Class 9","optional":"REL","marks":{"BAN":51,"ENG":69,"MAT":65,"PHY":{"theory":50,"practical":20},"CHE":{"theory":47,"practical":13},"BIO":{"theory":45,"practical":17},"REL":68}},{"id":"S012","name":"Nayeem Uddin","class":"Class 9","optional":"AGR","marks":{"BAN":64,"ENG":51,"MAT":60,"PHY":{"theory":35,"practical":16},"CHE":{"theory":42,"practical":16},"BIO":{"theory":42,"practical":18},"AGR":{"theory":40,"practical":19}}},{"id":"S013","name":"Ruma Karim","class":"Class 9","optional":"REL","marks":{"BAN":42,"ENG":53,"MAT":46,"PHY":{"theory":26,"practical":10},"CHE":{"theory":28,"practical":9},"BIO":{"theory":40,"practical":10},"REL":37}},{"id":"S014","name":"Jubayer Chowdhury","class":"Class 9","optional":"REL","marks":{"BAN":68,"ENG":56,"MAT":66,"PHY":{"theory":44,"practical":13},"CHE":{"theory":35,"practical":19},"BIO":{"theory":40,"practical":13},"REL":61}},{"id":"S015","name":"Ashiq Mia","class":"Class 9","optional":"AGR","marks":{"BAN":54,"ENG":58,"MAT":54,"PHY":{"theory":39,"practical":19},"CHE":{"theory":49,"practical":14},"BIO":{"theory":49,"practical":16},"AGR":{"theory":45,"practical":16}}},{"id":"S016","name":"Sohel Rahman","class":"Class 9","optional":"REL","marks":{"BAN":50,"ENG":72,"MAT":60,"PHY":{"theory":44,"practical":15},"CHE":{"theory":51,"practical":20},"BIO":{"theory":41,"practical":18},"REL":72}},{"id":"S017","name":"Jarin Ahmed","class":"Class 9","optional":"REL","marks":{"BAN":41,"ENG":51,"MAT":44,"PHY":{"theory":35,"practical":9},"CHE":{"theory":30,"practical":10},"BIO":{"theory":32,"practical":8},"REL":42}},{"id":"S018","name":"Nusrat Rahman","class":"Class 9","optional":"AGR","marks":{"BAN":64,"ENG":73,"MAT":73,"PHY":{"theory":48,"practical":19},"CHE":{"theory":48,"practical":19},"BIO":{"theory":41,"practical":18},"AGR":{"theory":42,"practical":17}}},{"id":"S019","name":"Robiul Sultana","class":"Class 9","optional":"HMT","marks":{"BAN":59,"ENG":65,"MAT":72,"PHY":{"theory":40,"practical":16},"CHE":{"theory":52,"practical":16},"BIO":{"theory":45,"practical":18},"HMT":{"theory":34,"practical":17}}},{"id":"S020","name":"Sumaiya Rahman","class":"Class 9","optional":"HMT","marks":{"BAN":87,"ENG":80,"MAT":78,"PHY":{"theory":66,"practical":19},"CHE":{"theory":59,"practical":22},"BIO":{"theory":60,"practical":25},"HMT":{"theory":63,"practical":22}}},{"id":"S021","name":"Mim Begum","class":"Class 9","optional":"AGR","marks":{"BAN":71,"ENG":73,"MAT":50,"PHY":{"theory":52,"practical":20},"CHE":{"theory":39,"practical":15},"BIO":{"theory":52,"practical":17},"AGR":{"theory":46,"practical":17}}},{"id":"S022","name":"Afsana Sarkar","class":"Class 9","optional":"AGR","marks":{"BAN":37,"ENG":44,"MAT":36,"PHY":{"theory":38,"practical":8},"CHE":{"theory":26,"practical":12},"BIO":{"theory":37,"practical":8},"AGR":{"theory":38,"practical":10}}},{"id":"S023","name":"Sajid Bhuiyan","class":"Class 10","optional":"REL","marks":{"BAN":84,"ENG":73,"MAT":92,"PHY":{"theory":51,"practical":21},"CHE":{"theory":69,"practical":23},"BIO":{"theory":62,"practical":25},"REL":85}},{"id":"S024","name":"Lamia Molla","class":"Class 10","optional":"AGR","marks":{"BAN":52,"ENG":69,"MAT":63,"PHY":{"theory":53,"practical":19},"CHE":{"theory":39,"practical":13},"BIO":{"theory":49,"practical":20},"AGR":{"theory":37,"practical":15}}},{"id":"S025","name":"Tareq Hossain","class":"Class 10","optional":"REL","marks":{"BAN":70,"ENG":51,"MAT":56,"PHY":{"theory":35,"practical":14},"CHE":{"theory":49,"practical":18},"BIO":{"theory":39,"practical":16},"REL":66}},{"id":"S026","name":"Sharmin Haque","class":"Class 10","optional":"HMT","marks":{"BAN":81,"ENG":90,"MAT":95,"PHY":{"theory":57,"practical":22},"CHE":{"theory":67,"practical":19},"BIO":{"theory":74,"practical":20},"HMT":{"theory":62,"practical":19}}},{"id":"S027","name":"Lamia Khatun","class":"Class 10","optional":"AGR","marks":{"BAN":74,"ENG":65,"MAT":67,"PHY":{"theory":36,"practical":20},"CHE":{"theory":49,"practical":14},"BIO":{"theory":54,"practical":17},"AGR":{"theory":40,"practical":20}}},{"id":"S028","name":"Nayeem Talukder","class":"Class 10","optional":"HMT","marks":{"BAN":57,"ENG":52,"MAT":61,"PHY":{"theory":50,"practical":13},"CHE":{"theory":41,"practical":15},"BIO":{"theory":51,"practical":16},"HMT":{"theory":46,"practical":17}}},{"id":"S029","name":"Masud Chowdhury","class":"Class 10","optional":"REL","marks":{"BAN":42,"ENG":46,"MAT":35,"PHY":{"theory":31,"practical":12},"CHE":{"theory":28,"practical":13},"BIO":{"theory":34,"practical":9},"REL":48}},{"id":"S030","name":"Tanha Rahman","class":"Class 10","optional":"AGR","marks":{"BAN":98,"ENG":96,"MAT":78,"PHY":{"theory":66,"practical":19},"CHE":{"theory":68,"practical":23},"BIO":{"theory":73,"practical":25},"AGR":{"theory":63,"practical":25}}},{"id":"S031","name":"Nazmul Sarkar","class":"Class 10","optional":"AGR","marks":{"BAN":72,"ENG":64,"MAT":67,"PHY":{"theory":44,"practical":18},"CHE":{"theory":43,"practical":17},"BIO":{"theory":49,"practical":16},"AGR":{"theory":40,"practical":20}}},{"id":"S032","name":"Jarin Sultana","class":"Class 10","optional":"AGR","marks":{"BAN":93,"ENG":92,"MAT":84,"PHY":{"theory":65,"practical":25},"CHE":{"theory":56,"practical":21},"BIO":{"theory":61,"practical":19},"AGR":{"theory":72,"practical":23}}},{"id":"S033","name":"Sabbir Begum","class":"Class 10","optional":"HMT","marks":{"BAN":98,"ENG":98,"MAT":83,"PHY":{"theory":63,"practical":19},"CHE":{"theory":63,"practical":25},"BIO":{"theory":59,"practical":19},"HMT":{"theory":71,"practical":25}}},{"id":"S034","name":"Ishrat Bhuiyan","class":"Class 10","optional":"REL","marks":{"BAN":38,"ENG":45,"MAT":46,"PHY":{"theory":33,"practical":11},"CHE":{"theory":31,"practical":13},"BIO":{"theory":28,"practical":12},"REL":55}},{"id":"S035","name":"Shakib Begum","class":"Class 10","optional":"HMT","marks":{"BAN":64,"ENG":67,"MAT":62,"PHY":{"theory":49,"practical":19},"CHE":{"theory":48,"practical":14},"BIO":{"theory":51,"practical":18},"HMT":{"theory":50,"practical":20}}},{"id":"S036","name":"Nazmul Chowdhury","class":"Class 10","optional":"HMT","marks":{"BAN":63,"ENG":70,"MAT":65,"PHY":{"theory":40,"practical":19},"CHE":{"theory":47,"practical":18},"BIO":{"theory":45,"practical":13},"HMT":{"theory":37,"practical":16}}},{"id":"S037","name":"Mim Das","class":"Class 10","optional":"REL","marks":{"BAN":81,"ENG":95,"MAT":94,"PHY":{"theory":54,"practical":19},"CHE":{"theory":56,"practical":20},"BIO":{"theory":59,"practical":22},"REL":78}},{"id":"S038","name":"Rifat Molla","class":"Class 10","optional":"AGR","marks":{"BAN":38,"ENG":38,"MAT":46,"PHY":{"theory":30,"practical":9},"CHE":{"theory":27,"practical":14},"BIO":{"theory":32,"practical":14},"AGR":{"theory":40,"practical":14}}},{"id":"S039","name":"Jarin Chowdhury","class":"Class 10","optional":"HMT","marks":{"BAN":38,"ENG":45,"MAT":38,"PHY":{"theory":35,"practical":8},"CHE":{"theory":32,"practical":11},"BIO":{"theory":38,"practical":8},"HMT":{"theory":36,"practical":8}}},{"id":"S040","name":"Rakib Hossain","class":"Class 10","optional":"REL","marks":{"BAN":74,"ENG":88,"MAT":93,"PHY":{"theory":70,"practical":24},"CHE":{"theory":70,"practical":21},"BIO":{"theory":62,"practical":23},"REL":98}},{"id":"S041","name":"Zahid Das","class":"Class 10","optional":"HMT","marks":{"BAN":43,"ENG":37,"MAT":35,"PHY":{"theory":40,"practical":8},"CHE":{"theory":27,"practical":13},"BIO":{"theory":40,"practical":12},"HMT":{"theory":30,"practical":13}}},{"id":"S042","name":"Shakib Talukder","class":"Class 10","optional":"AGR","marks":{"BAN":66,"ENG":63,"MAT":72,"PHY":{"theory":34,"practical":20},"CHE":{"theory":55,"practical":20},"BIO":{"theory":42,"practical":15},"AGR":{"theory":43,"practical":19}}},{"id":"S043","name":"Sajid Haque","class":"Class 10","optional":"REL","marks":{"BAN":42,"ENG":46,"MAT":45,"PHY":{"theory":39,"practical":8},"CHE":{"theory":37,"practical":8},"BIO":{"theory":36,"practical":11},"REL":47}},{"id":"S044","name":"Sohel Begum","class":"Class 10","optional":"AGR","marks":{"BAN":97,"ENG":75,"MAT":75,"PHY":{"theory":74,"practical":21},"CHE":{"theory":55,"practical":21},"BIO":{"theory":50,"practical":25},"AGR":{"theory":74,"practical":20}}},{"id":"S045","name":"Lamia Islam","class":"Class 9","optional":"HMT","marks":{"BAN":74,"ENG":87,"MAT":25,"PHY":{"theory":63,"practical":20},"CHE":{"theory":73,"practical":22},"BIO":{"theory":69,"practical":24},"HMT":{"theory":61,"practical":25}}},{"id":"S046","name":"Fahim Haque","class":"Class 10","optional":"HMT","marks":{"BAN":75,"ENG":89,"MAT":98,"PHY":{"theory":68,"practical":6},"CHE":{"theory":53,"practical":21},"BIO":{"theory":67,"practical":22},"HMT":{"theory":54,"practical":22}}},{"id":"S047","name":"Hasib Haque","class":"Class 9","optional":"AGR","marks":{"BAN":59,"ENG":69,"MAT":63,"PHY":{"theory":52,"practical":20},"CHE":{"theory":38,"practical":14},"BIO":{"theory":35,"practical":15},"AGR":{"theory":28,"practical":12}}},{"id":"S048","name":"Afsana Chowdhury","class":"Class 10","optional":"REL","marks":{"BAN":60,"ENG":"AB","MAT":72,"PHY":{"theory":47,"practical":15},"CHE":{"theory":52,"practical":16},"BIO":{"theory":45,"practical":18},"REL":60}},{"id":"S049","name":"Sharmin Uddin","class":"Class 9","optional":"AGR","marks":{"BAN":90,"ENG":78,"MAT":28,"PHY":{"theory":55,"practical":20},"CHE":{"theory":74,"practical":22},"BIO":{"theory":60,"practical":21},"AGR":{"theory":61,"practical":21}}},{"id":"S050","name":"Arif Sheikh","class":"Class 10","optional":"REL","marks":{"BAN":87,"ENG":85,"MAT":83,"PHY":{"theory":63,"practical":7},"CHE":{"theory":71,"practical":23},"BIO":{"theory":68,"practical":25},"REL":81}},{"id":"S051","name":"Mitu Begum","class":"Class 9","optional":"HMT","marks":{"BAN":77,"ENG":75,"MAT":82,"PHY":{"theory":61,"practical":23},"CHE":{"theory":64,"practical":21},"BIO":{"theory":57,"practical":25},"HMT":"AB"}},{"id":"S052","name":"Rupa Ahmed","class":"Class 10","optional":"REL","marks":{"BAN":54,"ENG":71,"MAT":62,"PHY":{"theory":55,"practical":19},"CHE":{"theory":53,"practical":18},"BIO":"AB","REL":53}},{"id":"S053","name":"Rakib Sheikh","class":"Class 9","optional":"HMT","marks":{"BAN":54,"ENG":51,"MAT":56,"PHY":{"theory":43,"practical":13},"CHE":{"theory":35,"practical":18},"BIO":{"theory":40,"practical":19},"HMT":{"theory":42,"practical":19}}},{"id":"S054","name":"Tanha Begum","class":"Class 10","optional":"REL","marks":{"BAN":65,"ENG":56,"MAT":71,"PHY":{"theory":41,"practical":16},"CHE":{"theory":35,"practical":19},"BIO":{"theory":52,"practical":17},"REL":63}},{"id":"S055","name":"Mim Sultana","class":"Class 9","optional":"REL","marks":{"BAN":67,"ENG":62,"MAT":72,"PHY":{"theory":54,"practical":19},"CHE":{"theory":37,"practical":16},"BIO":{"theory":53,"practical":20},"REL":66}},{"id":"S056","name":"Priya Haque","class":"Class 10","optional":"HMT","marks":{"BAN":64,"ENG":74,"MAT":67,"PHY":{"theory":34,"practical":13},"CHE":{"theory":36,"practical":20},"BIO":{"theory":37,"practical":15},"HMT":{"theory":45,"practical":18}}},{"id":"S057","name":"Masud Begum","class":"Class 9","optional":"HMT","marks":{"BAN":52,"ENG":55,"MAT":63,"PHY":{"theory":53,"practical":19},"CHE":{"theory":53,"practical":13},"BIO":{"theory":46,"practical":19},"HMT":{"theory":43,"practical":19}}},{"id":"S058","name":"Tanvir Mia","class":"Class 10","optional":"HMT","marks":{"BAN":98,"ENG":77,"MAT":77,"PHY":{"theory":51,"practical":22},"CHE":{"theory":52,"practical":21},"BIO":{"theory":70,"practical":23},"HMT":{"theory":50,"practical":24}}},{"id":"S059","name":"Anika Molla","class":"Class 9","optional":"AGR","marks":{"BAN":38,"ENG":48,"MAT":46,"PHY":{"theory":35,"practical":8},"CHE":{"theory":26,"practical":8},"BIO":{"theory":29,"practical":8},"AGR":{"theory":27,"practical":9}}},{"id":"S060","name":"Farhana Ahmed","class":"Class 10","optional":"AGR","marks":{"BAN":68,"ENG":58,"MAT":64,"PHY":{"theory":41,"practical":16},"CHE":{"theory":42,"practical":19},"BIO":{"theory":37,"practical":16},"AGR":{"theory":39,"practical":13}}}]};
+
+function loadBuiltIn(){
+  initApp({cases:[BUILTIN_CASE]});
+}
+
 /* ─── AUTO-LOAD AT STARTUP ─── */
+function setLoadStatus(html, tone){
+  const el = document.getElementById('load-status');
+  if(!el) return;
+  el.innerHTML = html;
+  el.style.color = tone === 'warn' ? 'var(--amber)' : 'var(--text-3)';
+}
+
 (async()=>{
   const paths = ['./P08_school_results_public.json', './P08/P08_school_results_public.json'];
-  for(const path of paths){
-    try{
-      const res = await fetch(path);
-      if(res.ok){
-        const j = await res.json();
-        initApp(j);
-        return;
-      }
-    }catch(e){}
+  const isFileProtocol = location.protocol === 'file:';
+
+  if(!isFileProtocol){
+    for(const path of paths){
+      try{
+        const res = await fetch(path);
+        if(res.ok){
+          const j = await res.json();
+          initApp(j);
+          return;
+        }
+      }catch(e){}
+    }
   }
+
+  // fetch() is blocked on file:// and the marks file was not found over http.
+  // Say so plainly instead of leaving a status line spinning forever.
+  setLoadStatus(isFileProtocol
+    ? 'Opened directly from disk, so the browser blocks reading the marks file automatically. Drop <code>P08_school_results_public.json</code> above, or use the built-in dataset.'
+    : 'No marks file found next to this page. Upload one above, or use the built-in dataset.',
+    'warn');
+  const btn = document.getElementById('btn-builtin');
+  if(btn) btn.style.display = 'flex';
+
 })();
 </script>
 </body>

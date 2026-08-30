@@ -1,0 +1,1989 @@
+{
+ "schema_version": "2.1",
+ "problem_id": "P08",
+ "format_note": "Edge-case suite for the P08 result engine. Each student carries a `note` field naming the rule or branch it exercises; `note` is documentation only and is ignored by the engine. Expected results for every row are in P08_edge_cases_expected.json.",
+ "cases": [
+  {
+   "case_id": "EDGE-A-BANDS",
+   "subjects": [
+    {
+     "code": "BAN",
+     "name": "Bangla",
+     "practical": false
+    },
+    {
+     "code": "ENG",
+     "name": "English",
+     "practical": false
+    },
+    {
+     "code": "MAT",
+     "name": "Mathematics",
+     "practical": false
+    },
+    {
+     "code": "PHY",
+     "name": "Physics",
+     "practical": true
+    },
+    {
+     "code": "CHE",
+     "name": "Chemistry",
+     "practical": true
+    },
+    {
+     "code": "BIO",
+     "name": "Biology",
+     "practical": true
+    },
+    {
+     "code": "HMT",
+     "name": "Higher Mathematics",
+     "practical": true
+    },
+    {
+     "code": "AGR",
+     "name": "Agriculture",
+     "practical": true
+    },
+    {
+     "code": "REL",
+     "name": "Religious Studies",
+     "practical": false
+    }
+   ],
+   "compulsory": [
+    "BAN",
+    "ENG",
+    "MAT",
+    "PHY",
+    "CHE",
+    "BIO"
+   ],
+   "students": [
+    {
+     "id": "A001",
+     "name": "Band 100 → GP 5.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 100
+     },
+     "note": "R-10 top of scale: Bangla 100 → GP 5.0"
+    },
+    {
+     "id": "A002",
+     "name": "Band 80 → GP 5.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 80
+     },
+     "note": "R-10 lower edge of GP 5: Bangla 80 → GP 5.0"
+    },
+    {
+     "id": "A003",
+     "name": "Band 79 → GP 4.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 79
+     },
+     "note": "R-10 upper edge of GP 4: Bangla 79 → GP 4.0"
+    },
+    {
+     "id": "A004",
+     "name": "Band 70 → GP 4.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 70
+     },
+     "note": "R-10 lower edge of GP 4: Bangla 70 → GP 4.0"
+    },
+    {
+     "id": "A005",
+     "name": "Band 69 → GP 3.5",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 69
+     },
+     "note": "R-10 upper edge of GP 3.5: Bangla 69 → GP 3.5"
+    },
+    {
+     "id": "A006",
+     "name": "Band 60 → GP 3.5",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 60
+     },
+     "note": "R-10 lower edge of GP 3.5: Bangla 60 → GP 3.5"
+    },
+    {
+     "id": "A007",
+     "name": "Band 59 → GP 3.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 59
+     },
+     "note": "R-10 upper edge of GP 3: Bangla 59 → GP 3.0"
+    },
+    {
+     "id": "A008",
+     "name": "Band 50 → GP 3.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 50
+     },
+     "note": "R-10 lower edge of GP 3: Bangla 50 → GP 3.0"
+    },
+    {
+     "id": "A009",
+     "name": "Band 49 → GP 2.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 49
+     },
+     "note": "R-10 upper edge of GP 2: Bangla 49 → GP 2.0"
+    },
+    {
+     "id": "A010",
+     "name": "Band 40 → GP 2.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 40
+     },
+     "note": "R-10 lower edge of GP 2: Bangla 40 → GP 2.0"
+    },
+    {
+     "id": "A011",
+     "name": "Band 39 → GP 1.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 39
+     },
+     "note": "R-10 upper edge of GP 1: Bangla 39 → GP 1.0"
+    },
+    {
+     "id": "A012",
+     "name": "Band 33 → GP 1.0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 33
+     },
+     "note": "R-10 lower edge of GP 1 — the pass mark: Bangla 33 → GP 1.0"
+    },
+    {
+     "id": "A013",
+     "name": "Band 32 (fail)",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 32
+     },
+     "note": "R-10 one below the pass mark → subject fail: Bangla 32 → GP 0.0, compulsory fail"
+    },
+    {
+     "id": "A014",
+     "name": "Band 0 (fail)",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "ENG": 60,
+      "MAT": 60,
+      "PHY": {
+       "theory": 40,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 40,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 40,
+       "practical": 15
+      },
+      "REL": 75,
+      "BAN": 0
+     },
+     "note": "R-10 zero: Bangla 0 → GP 0.0, compulsory fail"
+    }
+   ]
+  },
+  {
+   "case_id": "EDGE-B-PRACTICAL",
+   "subjects": [
+    {
+     "code": "BAN",
+     "name": "Bangla",
+     "practical": false
+    },
+    {
+     "code": "ENG",
+     "name": "English",
+     "practical": false
+    },
+    {
+     "code": "MAT",
+     "name": "Mathematics",
+     "practical": false
+    },
+    {
+     "code": "PHY",
+     "name": "Physics",
+     "practical": true
+    },
+    {
+     "code": "CHE",
+     "name": "Chemistry",
+     "practical": true
+    },
+    {
+     "code": "BIO",
+     "name": "Biology",
+     "practical": true
+    },
+    {
+     "code": "HMT",
+     "name": "Higher Mathematics",
+     "practical": true
+    },
+    {
+     "code": "AGR",
+     "name": "Agriculture",
+     "practical": true
+    },
+    {
+     "code": "REL",
+     "name": "Religious Studies",
+     "practical": false
+    }
+   ],
+   "compulsory": [
+    "BAN",
+    "ENG",
+    "MAT",
+    "PHY",
+    "CHE",
+    "BIO"
+   ],
+   "students": [
+    {
+     "id": "B001",
+     "name": "Physics T25/P8",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 25,
+       "practical": 8
+      }
+     },
+     "note": "R-11 both parts exactly at the pass mark (25 and 8) → pass, total 33 → GP 1.0 (lowest total a passing practical subject can reach)"
+    },
+    {
+     "id": "B002",
+     "name": "Physics T24/P25",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 24,
+       "practical": 25
+      }
+     },
+     "note": "R-11 theory one below 25 with a perfect practical → subject fails, GP 0"
+    },
+    {
+     "id": "B003",
+     "name": "Physics T25/P7",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 25,
+       "practical": 7
+      }
+     },
+     "note": "R-11 practical one below 8 with theory exactly at pass → subject fails, GP 0"
+    },
+    {
+     "id": "B004",
+     "name": "Physics T75/P7",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 75,
+       "practical": 7
+      }
+     },
+     "note": "R-11 practical fail behind a perfect theory mark — trace must say total 82 would have given GP 5.0"
+    },
+    {
+     "id": "B005",
+     "name": "Physics T24/P7",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 24,
+       "practical": 7
+      }
+     },
+     "note": "R-11 both parts below their pass marks"
+    },
+    {
+     "id": "B006",
+     "name": "Physics T75/P25",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 75,
+       "practical": 25
+      }
+     },
+     "note": "R-11 both parts full → total 100 → GP 5.0; GPA lands exactly on the A boundary of 4.00"
+    },
+    {
+     "id": "B007",
+     "name": "Physics T0/P25",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 0,
+       "practical": 25
+      }
+     },
+     "note": "R-11 theory zero, practical full"
+    },
+    {
+     "id": "B008",
+     "name": "Physics T75/P0",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 75,
+       "practical": 0
+      }
+     },
+     "note": "R-11 practical zero, theory full"
+    },
+    {
+     "id": "B009",
+     "name": "Physics T55/P25",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 55,
+       "practical": 25
+      }
+     },
+     "note": "R-11 total exactly 80 → lower edge of GP 5"
+    },
+    {
+     "id": "B010",
+     "name": "Physics T26/P8",
+     "class": "Class 9",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 45,
+       "practical": 15
+      },
+      "REL": 65,
+      "PHY": {
+       "theory": 26,
+       "practical": 8
+      }
+     },
+     "note": "R-11 one mark above each pass mark → total 34"
+    }
+   ]
+  },
+  {
+   "case_id": "EDGE-C-OPTIONAL",
+   "subjects": [
+    {
+     "code": "BAN",
+     "name": "Bangla",
+     "practical": false
+    },
+    {
+     "code": "ENG",
+     "name": "English",
+     "practical": false
+    },
+    {
+     "code": "MAT",
+     "name": "Mathematics",
+     "practical": false
+    },
+    {
+     "code": "PHY",
+     "name": "Physics",
+     "practical": true
+    },
+    {
+     "code": "CHE",
+     "name": "Chemistry",
+     "practical": true
+    },
+    {
+     "code": "BIO",
+     "name": "Biology",
+     "practical": true
+    },
+    {
+     "code": "HMT",
+     "name": "Higher Mathematics",
+     "practical": true
+    },
+    {
+     "code": "AGR",
+     "name": "Agriculture",
+     "practical": true
+    },
+    {
+     "code": "REL",
+     "name": "Religious Studies",
+     "practical": false
+    }
+   ],
+   "compulsory": [
+    "BAN",
+    "ENG",
+    "MAT",
+    "PHY",
+    "CHE",
+    "BIO"
+   ],
+   "students": [
+    {
+     "id": "C001",
+     "name": "Optional HMT case 1",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "R-13 optional GP 5 → bonus +3 → raw 5.50, capped to 5.00"
+    },
+    {
+     "id": "C002",
+     "name": "Optional HMT case 2",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "HMT": {
+       "theory": 55,
+       "practical": 20
+      }
+     },
+     "note": "R-13 optional GP 4 → bonus +2 → raw 5.33, capped to 5.00"
+    },
+    {
+     "id": "C003",
+     "name": "Optional HMT case 3",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "HMT": {
+       "theory": 45,
+       "practical": 18
+      }
+     },
+     "note": "R-13 optional GP 3.5 → bonus +1.5 → raw 5.25, capped to 5.00"
+    },
+    {
+     "id": "C004",
+     "name": "Optional REL case 4",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "REL": 55
+     },
+     "note": "R-13 optional GP 3 → bonus +1 → raw 5.17, capped to 5.00"
+    },
+    {
+     "id": "C005",
+     "name": "Optional REL case 5",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "REL": 45
+     },
+     "note": "R-13 optional GP exactly 2.0 → bonus +0, GPA exactly 5.00 without the cap; on the optional list"
+    },
+    {
+     "id": "C006",
+     "name": "Optional REL case 6",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "REL": 35
+     },
+     "note": "R-13 optional GP 1 → bonus +0 (max(0, 1−2)); on the optional list"
+    },
+    {
+     "id": "C007",
+     "name": "Optional REL case 7",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "REL": 20
+     },
+     "note": "R-13 optional failed outright → GP 0, bonus +0, student still A+; on the optional list"
+    },
+    {
+     "id": "C008",
+     "name": "Optional REL case 8",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "REL": "AB"
+     },
+     "note": "R-12 absent in the OPTIONAL subject → contributes 0, student is not failed; on the optional and absent lists"
+    },
+    {
+     "id": "C009",
+     "name": "Optional HMT case 9",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 90,
+      "ENG": 90,
+      "MAT": 90,
+      "PHY": {
+       "theory": 65,
+       "practical": 25
+      },
+      "CHE": {
+       "theory": 65,
+       "practical": 25
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 25
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 5
+      }
+     },
+     "note": "R-11 practical fail in the OPTIONAL subject → GP 0, no compulsory failure, student still A+; on the optional and practical lists"
+    },
+    {
+     "id": "C010",
+     "name": "Bonus visible 10",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 55,
+      "ENG": 55,
+      "MAT": 55,
+      "PHY": {
+       "theory": 35,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 35,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 35,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "R-13 bonus +3 on a sum of 18 → 3.50, exactly the A− boundary"
+    },
+    {
+     "id": "C011",
+     "name": "Bonus visible 11",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 55,
+      "ENG": 55,
+      "MAT": 55,
+      "PHY": {
+       "theory": 35,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 35,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 35,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 55,
+       "practical": 20
+      }
+     },
+     "note": "R-13 bonus +2 → 3.33"
+    },
+    {
+     "id": "C012",
+     "name": "Bonus visible 12",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 55,
+      "ENG": 55,
+      "MAT": 55,
+      "PHY": {
+       "theory": 35,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 35,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 35,
+       "practical": 20
+      },
+      "REL": 55
+     },
+     "note": "R-13 bonus +1 → 3.17"
+    },
+    {
+     "id": "C013",
+     "name": "Bonus visible 13",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 55,
+      "ENG": 55,
+      "MAT": 55,
+      "PHY": {
+       "theory": 35,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 35,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 35,
+       "practical": 20
+      },
+      "REL": 45
+     },
+     "note": "R-13 optional GP 2.0 → bonus +0 → 3.00, exactly the B boundary; on the optional list"
+    },
+    {
+     "id": "C014",
+     "name": "Bonus visible 14",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 55,
+      "ENG": 55,
+      "MAT": 55,
+      "PHY": {
+       "theory": 35,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 35,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 35,
+       "practical": 20
+      },
+      "REL": 10
+     },
+     "note": "R-13 optional GP 0 → bonus +0 → 3.00, identical to the GP-2.0 student; on the optional list"
+    },
+    {
+     "id": "C015",
+     "name": "Exactly 2.00 (C)",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 45,
+      "ENG": 45,
+      "MAT": 45,
+      "PHY": {
+       "theory": 32,
+       "practical": 13
+      },
+      "CHE": {
+       "theory": 32,
+       "practical": 13
+      },
+      "BIO": {
+       "theory": 32,
+       "practical": 13
+      },
+      "REL": 45
+     },
+     "note": "All six compulsory at GP 2 (sum 12), bonus +0 → GPA exactly 2.00, the C boundary; on the optional list"
+    },
+    {
+     "id": "C016",
+     "name": "Exactly 1.00 (D)",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 33,
+      "ENG": 33,
+      "MAT": 33,
+      "PHY": {
+       "theory": 25,
+       "practical": 8
+      },
+      "CHE": {
+       "theory": 25,
+       "practical": 8
+      },
+      "BIO": {
+       "theory": 25,
+       "practical": 8
+      },
+      "REL": 33
+     },
+     "note": "Every compulsory subject at the pass mark → GPA exactly 1.00. This is the lowest GPA a passing student can have: below 1.00 always means a failure, so D never sits next to a non-F value under 1.00"
+    },
+    {
+     "id": "C017",
+     "name": "Just below A (3.92)",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 75,
+      "ENG": 75,
+      "MAT": 75,
+      "PHY": {
+       "theory": 55,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 55,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 50,
+       "practical": 15
+      },
+      "REL": 45
+     },
+     "note": "Sum 23.5 → 3.9167 → shown 3.92, one step below the A boundary; on the optional list"
+    },
+    {
+     "id": "C018",
+     "name": "Just below A- (3.42)",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 65,
+      "ENG": 65,
+      "MAT": 65,
+      "PHY": {
+       "theory": 45,
+       "practical": 15
+      },
+      "CHE": {
+       "theory": 45,
+       "practical": 15
+      },
+      "BIO": {
+       "theory": 35,
+       "practical": 20
+      },
+      "REL": 45
+     },
+     "note": "Sum 20.5 → 3.4167 → shown 3.42, one step below the A− boundary; on the optional list"
+    },
+    {
+     "id": "C019",
+     "name": "Just below B (2.92)",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 55,
+      "ENG": 55,
+      "MAT": 55,
+      "PHY": {
+       "theory": 35,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 32,
+       "practical": 13
+      },
+      "BIO": {
+       "theory": 32,
+       "practical": 13
+      },
+      "REL": 65
+     },
+     "note": "Sum 16 plus bonus 1.5 = 17.5 → 2.9167 → shown 2.92, one step below the B boundary"
+    },
+    {
+     "id": "C020",
+     "name": "Just below C (1.92)",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 45,
+      "ENG": 45,
+      "MAT": 45,
+      "PHY": {
+       "theory": 32,
+       "practical": 13
+      },
+      "CHE": {
+       "theory": 25,
+       "practical": 8
+      },
+      "BIO": {
+       "theory": 25,
+       "practical": 8
+      },
+      "REL": 65
+     },
+     "note": "Sum 10 plus bonus 1.5 = 11.5 → 1.9167 → shown 1.92, one step below the C boundary"
+    }
+   ]
+  },
+  {
+   "case_id": "EDGE-D-LISTS",
+   "subjects": [
+    {
+     "code": "BAN",
+     "name": "Bangla",
+     "practical": false
+    },
+    {
+     "code": "ENG",
+     "name": "English",
+     "practical": false
+    },
+    {
+     "code": "MAT",
+     "name": "Mathematics",
+     "practical": false
+    },
+    {
+     "code": "PHY",
+     "name": "Physics",
+     "practical": true
+    },
+    {
+     "code": "CHE",
+     "name": "Chemistry",
+     "practical": true
+    },
+    {
+     "code": "BIO",
+     "name": "Biology",
+     "practical": true
+    },
+    {
+     "code": "HMT",
+     "name": "Higher Mathematics",
+     "practical": true
+    },
+    {
+     "code": "AGR",
+     "name": "Agriculture",
+     "practical": true
+    },
+    {
+     "code": "REL",
+     "name": "Religious Studies",
+     "practical": false
+    }
+   ],
+   "compulsory": [
+    "BAN",
+    "ENG",
+    "MAT",
+    "PHY",
+    "CHE",
+    "BIO"
+   ],
+   "students": [
+    {
+     "id": "D001",
+     "name": "High average, one failure",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 95,
+      "ENG": 92,
+      "MAT": 28,
+      "PHY": {
+       "theory": 70,
+       "practical": 24
+      },
+      "CHE": {
+       "theory": 68,
+       "practical": 23
+      },
+      "BIO": {
+       "theory": 72,
+       "practical": 25
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "R-13 cancellation: five subjects at GP 5 and a Maths mark of 28. Final GPA 0.00 / F, but the trace must still show the uncancelled 4.67 and name Mathematics as the cause"
+    },
+    {
+     "id": "D002",
+     "name": "Absent in one compulsory",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 95,
+      "ENG": 92,
+      "MAT": 90,
+      "PHY": {
+       "theory": 70,
+       "practical": 24
+      },
+      "CHE": {
+       "theory": 68,
+       "practical": 23
+      },
+      "BIO": "AB",
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "R-12 absent in a compulsory subject → AB shown, GP 0, overall F even though every other subject is GP 5; on the absent list"
+    },
+    {
+     "id": "D003",
+     "name": "Absent in two compulsory",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": "AB",
+      "ENG": 92,
+      "MAT": 90,
+      "PHY": {
+       "theory": 70,
+       "practical": 24
+      },
+      "CHE": "AB",
+      "BIO": {
+       "theory": 72,
+       "practical": 25
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "R-12 two absences — the trace must list both"
+    },
+    {
+     "id": "D004",
+     "name": "On all three lists",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 85,
+      "ENG": 80,
+      "MAT": 78,
+      "PHY": {
+       "theory": 60,
+       "practical": 4
+      },
+      "CHE": {
+       "theory": 55,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 58,
+       "practical": 22
+      },
+      "REL": "AB"
+     },
+     "note": "R-29 one student, three lists: optional absent (optional + absent lists) and a Physics practical fail (practical list). The Physics fail is compulsory, so the result is F"
+    },
+    {
+     "id": "D005",
+     "name": "Practical list only",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 85,
+      "ENG": 80,
+      "MAT": 78,
+      "PHY": {
+       "theory": 60,
+       "practical": 6
+      },
+      "CHE": {
+       "theory": 55,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 58,
+       "practical": 22
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "R-29 practical list only — optional GP 5 keeps this student off the optional list"
+    },
+    {
+     "id": "D006",
+     "name": "Optional list only",
+     "class": "Class 10",
+     "optional": "REL",
+     "marks": {
+      "BAN": 85,
+      "ENG": 80,
+      "MAT": 78,
+      "PHY": {
+       "theory": 60,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 55,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 58,
+       "practical": 22
+      },
+      "REL": 40
+     },
+     "note": "R-29 optional list only, and the student passes — proof the list is a checking aid, not a penalty"
+    },
+    {
+     "id": "D007",
+     "name": "Absent list only",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 85,
+      "ENG": 80,
+      "MAT": 78,
+      "PHY": {
+       "theory": 60,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 55,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 58,
+       "practical": 22
+      },
+      "HMT": "AB"
+     },
+     "note": "R-29 absent list only: the optional is absent, so GP 0 also puts the student on the optional list — this pairing is unavoidable and is worth eyeballing"
+    },
+    {
+     "id": "D008",
+     "name": "Clean pass, no lists",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 85,
+      "ENG": 80,
+      "MAT": 78,
+      "PHY": {
+       "theory": 60,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 55,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 58,
+       "practical": 22
+      },
+      "HMT": {
+       "theory": 45,
+       "practical": 18
+      }
+     },
+     "note": "Control row: passes everything, on no list at all, and no cap in play"
+    }
+   ]
+  },
+  {
+   "case_id": "EDGE-E-DATA",
+   "subjects": [
+    {
+     "code": "BAN",
+     "name": "Bangla",
+     "practical": false
+    },
+    {
+     "code": "ENG",
+     "name": "English",
+     "practical": false
+    },
+    {
+     "code": "MAT",
+     "name": "Mathematics",
+     "practical": false
+    },
+    {
+     "code": "PHY",
+     "name": "Physics",
+     "practical": true
+    },
+    {
+     "code": "CHE",
+     "name": "Chemistry",
+     "practical": true
+    },
+    {
+     "code": "BIO",
+     "name": "Biology <img src=x onerror=alert('subject-name')>",
+     "practical": true
+    },
+    {
+     "code": "HMT",
+     "name": "Higher Mathematics",
+     "practical": true
+    },
+    {
+     "code": "AGR",
+     "name": "Agriculture",
+     "practical": true
+    },
+    {
+     "code": "REL",
+     "name": "Religious Studies",
+     "practical": false
+    }
+   ],
+   "compulsory": [
+    "BAN",
+    "ENG",
+    "MAT",
+    "PHY",
+    "CHE",
+    "BIO"
+   ],
+   "students": [
+    {
+     "id": "E001",
+     "name": "<script>alert('name')</script>",
+     "class": "<img src=y onerror=alert('class')>",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "Encoding: script tag in the name, event handler in the class. Must render as literal text, execute nothing. Marks are clean, so the result is a normal A+"
+    },
+    {
+     "id": "E002'),alert('id')//",
+     "name": "Hostile id",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "Encoding: the id carries a quote and paren aimed at the row click handler. Must stay clickable and inert"
+    },
+    {
+     "id": "E003",
+     "name": "Out of range high",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 150,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 95,
+       "practical": 40
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "D-3 marks above their ceilings: 150/100, theory 95/75, practical 40/25. Each is clamped and reported; grading continues"
+    },
+    {
+     "id": "E004",
+     "name": "Out of range low",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": -10,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": -5,
+       "practical": -3
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "D-3 negative marks clamped to 0 — which then fails Chemistry on both parts, so the result is F"
+    },
+    {
+     "id": "E005",
+     "name": "Wrong types",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": "eighty",
+      "MAT": true,
+      "PHY": {
+       "theory": "fifty",
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "D-2 a string where a number belongs, a string theory mark, and a boolean. All three are unusable → GP 0 and F, never NaN"
+    },
+    {
+     "id": "E006",
+     "name": "Shape mismatch",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": {
+       "theory": 40,
+       "practical": 20
+      },
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": 72,
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "D-2 a practical subject given a bare number and a theory-only subject given an object — both shapes rejected"
+    },
+    {
+     "id": "E007",
+     "name": "Null and array marks",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": null,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": [
+       60,
+       20
+      ],
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "D-2 null and array marks rejected rather than coerced"
+    },
+    {
+     "id": "E008",
+     "name": "Missing compulsory marks",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": 70
+     },
+     "note": "D-1 four compulsory subjects and the optional have no entry at all — each is named individually"
+    },
+    {
+     "id": "E009",
+     "name": "Unknown subject code",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      },
+      "HACK": 100,
+      "BAN2": 90
+     },
+     "note": "D-4 marks for codes that are neither compulsory nor this student's optional — ignored, not graded, reported"
+    },
+    {
+     "id": "E010",
+     "name": "Optional not in schema",
+     "class": "Class 10",
+     "optional": "XYZ",
+     "marks": {
+      "BAN": 80,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      },
+      "XYZ": 85
+     },
+     "note": "D-4 the optional names a subject the case never declared. Treated as theory-only, graded, and flagged for the office"
+    },
+    {
+     "id": "E011",
+     "name": "No optional declared",
+     "class": "Class 10",
+     "optional": null,
+     "marks": {
+      "BAN": 80,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "D-1 the optional field is missing. The six compulsory subjects still grade; the missing optional contributes 0"
+    },
+    {
+     "id": "E012",
+     "name": "No marks object",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": null,
+     "note": "D-1 the marks object itself is missing — every subject reported, nothing crashes"
+    },
+    {
+     "id": "E013",
+     "name": "AB in a practical subject",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": "AB",
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "R-12 beats R-11: an absent practical subject is an absence, not a practical fail, so this student is on the absent list only"
+    },
+    {
+     "id": "E014",
+     "name": "Very long name ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ইসলাম ",
+     "class": "Class 10",
+     "optional": "HMT",
+     "marks": {
+      "BAN": 80,
+      "ENG": 75,
+      "MAT": 90,
+      "PHY": {
+       "theory": 50,
+       "practical": 20
+      },
+      "CHE": {
+       "theory": 60,
+       "practical": 20
+      },
+      "BIO": {
+       "theory": 65,
+       "practical": 20
+      },
+      "HMT": {
+       "theory": 70,
+       "practical": 25
+      }
+     },
+     "note": "Layout: a long multi-byte name must not break the table, the modal or the printed marksheet"
+    }
+   ]
+  }
+ ]
+}
