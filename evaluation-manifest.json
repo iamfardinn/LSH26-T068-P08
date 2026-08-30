@@ -7,8 +7,8 @@
             "problem_id": "P08",
             "repository_url": "https://github.com/iamfardinn/LSH26-T068-P08",
             "live_url": "https://gpaengine.netlify.app/",
-            "commit_sha": "",
-            "loads_sample_data": "yes|no, and how (file upload | typed | seeded on start)",
+            "commit_sha": "de63e03a0c1f50d22c687d7ac1510415eb9f2af0",
+            "loads_sample_data": "no, (file upload )",
             "requirements": {
                 "R1": {
                     "status": "complete|partial|not_attempted",
