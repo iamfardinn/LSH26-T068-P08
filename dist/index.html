@@ -1,0 +1,2995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Processes school marks sheets into GPA results, shows the rule behind every grade point, and lists the results a teacher must verify by hand.">
+<title>Result Engine — SSC marks processing &amp; verification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   One accent. Semantic colour reserved for status only.
+   Grades use a deliberate sequential ramp, not eight hues.
+═══════════════════════════════════════════════════════════ */
+:root{
+  /* surfaces */
+  --bg-0:#0A0C11;      /* page            */
+  --bg-1:#0F131A;      /* card            */
+  --bg-2:#151A23;      /* raised / hover  */
+  --bg-3:#1B212C;      /* input / inset   */
+  --line:#212734;
+  --line-2:#2C3444;
+
+  /* text */
+  --tx-0:#EDF0F5;
+  --tx-1:#9BA6B8;
+  --tx-2:#67728A;
+
+  /* accent */
+  --ac:#6366F1;
+  --ac-2:#818CF8;
+  --ac-soft:rgba(99,102,241,.12);
+  --ac-line:rgba(99,102,241,.32);
+
+  /* status */
+  --ok:#22C55E;   --ok-soft:rgba(34,197,94,.12);   --ok-line:rgba(34,197,94,.3);
+  --warn:#F59E0B; --warn-soft:rgba(245,158,11,.12);--warn-line:rgba(245,158,11,.3);
+  --bad:#EF4444;  --bad-soft:rgba(239,68,68,.12);  --bad-line:rgba(239,68,68,.3);
+  --info:#38BDF8; --info-soft:rgba(56,189,248,.12);--info-line:rgba(56,189,248,.3);
+
+  /* grade ramp: ordered best → worst */
+  --gr-ap:#22C55E; --gr-a:#4ADE80; --gr-am:#38BDF8;
+  --gr-b:#60A5FA;  --gr-c:#A78BFA; --gr-d:#F59E0B; --gr-f:#EF4444;
+
+  /* type */
+  --sans:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+
+  /* space */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px;
+  --s6:24px; --s7:32px; --s8:40px; --s9:56px;
+
+  /* radius */
+  --r1:6px; --r2:8px; --r3:12px; --r4:16px; --r5:20px;
+
+  /* elevation */
+  --e1:0 1px 2px rgba(0,0,0,.4);
+  --e2:0 4px 16px rgba(0,0,0,.45);
+  --e3:0 16px 48px rgba(0,0,0,.6);
+
+  --tr:.16s cubic-bezier(.4,0,.2,1);
+  --nav-h:56px; --hdr-h:60px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{
+  font-family:var(--sans);background:var(--bg-0);color:var(--tx-0);
+  font-size:13px;line-height:1.55;min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:'cv02','cv03','cv04','tnum';
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;}
+}
+
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:100px;}
+::-webkit-scrollbar-thumb:hover{background:#3A4356;}
+
+:focus-visible{outline:2px solid var(--ac-2);outline-offset:2px;border-radius:var(--r1);}
+.ico{width:16px;height:16px;flex-shrink:0;display:block;}
+.ico-lg{width:20px;height:20px;}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+/* ═══════════════ TYPE RAMP ═══════════════ */
+.t-display{font-size:32px;font-weight:800;letter-spacing:-.03em;line-height:1.1;}
+.t-h1{font-size:19px;font-weight:700;letter-spacing:-.02em;}
+.t-h2{font-size:15px;font-weight:650;letter-spacing:-.01em;}
+.t-h3{font-size:13px;font-weight:600;}
+.t-sm{font-size:12px;}
+.t-xs{font-size:11px;}
+.t-label{
+  font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.09em;color:var(--tx-2);
+}
+.t-dim{color:var(--tx-1);}
+.t-dimmer{color:var(--tx-2);}
+
+/* ═══════════════ APP SHELL ═══════════════ */
+.hdr{
+  position:sticky;top:0;z-index:120;height:var(--hdr-h);
+  background:rgba(10,12,17,.82);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.hdr-in{
+  max-width:1640px;margin:0 auto;height:100%;
+  display:flex;align-items:center;gap:var(--s4);padding:0 var(--s6);
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;}
+.brand-mark{
+  width:30px;height:30px;border-radius:var(--r2);flex-shrink:0;
+  background:linear-gradient(140deg,var(--ac),#8B5CF6);
+  display:grid;place-items:center;color:#fff;
+  box-shadow:0 2px 10px rgba(99,102,241,.35);
+}
+.brand-txt{min-width:0;}
+.brand-txt h1{font-size:13.5px;font-weight:670;letter-spacing:-.01em;white-space:nowrap;}
+.brand-txt p{
+  font-size:10.5px;color:var(--tx-2);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.hdr-gap{flex:1;}
+.hdr-actions{display:flex;align-items:center;gap:var(--s2);}
+
+.casepick{display:flex;align-items:center;gap:var(--s2);}
+.casepick .t-label{white-space:nowrap;}
+
+/* ═══════════════ NAV ═══════════════ */
+.nav{
+  position:sticky;top:var(--hdr-h);z-index:110;
+  background:var(--bg-0);border-bottom:1px solid var(--line);
+}
+.nav-in{
+  max-width:1640px;margin:0 auto;padding:0 var(--s6);
+  display:flex;gap:var(--s1);overflow-x:auto;scrollbar-width:none;
+}
+.nav-in::-webkit-scrollbar{display:none;}
+.tab-btn{
+  position:relative;display:flex;align-items:center;gap:7px;
+  padding:0 14px;height:var(--nav-h);flex-shrink:0;
+  font-family:inherit;font-size:12.5px;font-weight:550;
+  color:var(--tx-2);background:none;border:none;cursor:pointer;
+  transition:color var(--tr);white-space:nowrap;
+}
+.tab-btn::after{
+  content:'';position:absolute;left:10px;right:10px;bottom:0;height:2px;
+  background:var(--ac);border-radius:2px 2px 0 0;
+  transform:scaleX(0);transition:transform var(--tr);
+}
+.tab-btn:hover{color:var(--tx-1);}
+.tab-btn.active{color:var(--tx-0);}
+.tab-btn.active::after{transform:scaleX(1);}
+.tab-btn.active .ico{color:var(--ac-2);}
+.tbadge{
+  min-width:18px;padding:1px 6px;border-radius:100px;
+  background:var(--bg-2);color:var(--tx-2);
+  font-family:var(--mono);font-size:10px;font-weight:600;
+}
+.tab-btn.active .tbadge{background:var(--ac-soft);color:var(--ac-2);}
+.tbadge[data-alert="1"]{background:var(--warn-soft);color:var(--warn);}
+
+.wrap{max-width:1640px;margin:0 auto;width:100%;padding:var(--s6);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;animation:fade .22s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+/* ═══════════════ PRIMITIVES ═══════════════ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:34px;padding:0 13px;border-radius:var(--r2);
+  font-family:inherit;font-size:12.5px;font-weight:550;
+  cursor:pointer;border:1px solid transparent;
+  transition:background var(--tr),border-color var(--tr),color var(--tr),transform var(--tr);
+  white-space:nowrap;text-decoration:none;
+}
+.btn:active{transform:translateY(1px);}
+.btn-pri{background:var(--ac);color:#fff;box-shadow:var(--e1);}
+.btn-pri:hover{background:var(--ac-2);}
+.btn-ghost{background:var(--bg-2);color:var(--tx-1);border-color:var(--line);}
+.btn-ghost:hover{background:var(--bg-3);color:var(--tx-0);border-color:var(--line-2);}
+.btn-quiet{background:transparent;color:var(--tx-2);}
+.btn-quiet:hover{background:var(--bg-2);color:var(--tx-0);}
+.btn-warn{background:transparent;color:var(--warn);border-color:var(--warn-line);}
+.btn-warn:hover{background:var(--warn-soft);}
+.btn-lg{height:40px;padding:0 18px;font-size:13px;}
+.btn-icon{width:34px;padding:0;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+.field{
+  height:34px;padding:0 11px;border-radius:var(--r2);
+  background:var(--bg-2);border:1px solid var(--line);color:var(--tx-0);
+  font-family:inherit;font-size:12.5px;outline:none;
+  transition:border-color var(--tr),background var(--tr);
+}
+.field:hover{border-color:var(--line-2);}
+.field:focus{border-color:var(--ac-line);background:var(--bg-3);}
+.field::placeholder{color:var(--tx-2);}
+select.field{
+  cursor:pointer;appearance:none;padding-right:28px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2367728A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-repeat:no-repeat;background-position:right 8px center;
+}
+.search-wrap{position:relative;display:flex;align-items:center;}
+.search-wrap .ico{position:absolute;left:10px;color:var(--tx-2);pointer-events:none;}
+.search-wrap .field{padding-left:32px;}
+
+.card{
+  background:var(--bg-1);border:1px solid var(--line);
+  border-radius:var(--r3);
+}
+.card-hd{
+  display:flex;align-items:center;gap:var(--s3);
+  padding:var(--s4) var(--s5);border-bottom:1px solid var(--line);
+}
+.card-hd h3{flex:1;min-width:0;}
+.card-bd{padding:var(--s5);}
+
+.sec{display:flex;align-items:flex-start;gap:var(--s4);margin-bottom:var(--s5);flex-wrap:wrap;}
+.sec-t{flex:1;min-width:220px;}
+.sec-t h2{font-size:19px;font-weight:700;letter-spacing:-.02em;}
+.sec-t p{font-size:12.5px;color:var(--tx-1);margin-top:2px;}
+
+/* badges + chips */
+.gb{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:30px;height:26px;padding:0 8px;border-radius:var(--r1);
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  background:var(--gc-soft);color:var(--gc);border:1px solid var(--gc-line);
+}
+[data-grade="A+"]{--gc:var(--gr-ap);--gc-soft:rgba(34,197,94,.13);--gc-line:rgba(34,197,94,.3);}
+[data-grade="A"] {--gc:var(--gr-a); --gc-soft:rgba(74,222,128,.13);--gc-line:rgba(74,222,128,.3);}
+[data-grade="A-"]{--gc:var(--gr-am);--gc-soft:rgba(56,189,248,.13);--gc-line:rgba(56,189,248,.3);}
+[data-grade="B"] {--gc:var(--gr-b); --gc-soft:rgba(96,165,250,.13);--gc-line:rgba(96,165,250,.3);}
+[data-grade="C"] {--gc:var(--gr-c); --gc-soft:rgba(167,139,250,.13);--gc-line:rgba(167,139,250,.3);}
+[data-grade="D"] {--gc:var(--gr-d); --gc-soft:rgba(245,158,11,.13);--gc-line:rgba(245,158,11,.3);}
+[data-grade="F"] {--gc:var(--gr-f); --gc-soft:rgba(239,68,68,.13);--gc-line:rgba(239,68,68,.3);}
+
+.chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:100px;
+  font-size:10.5px;font-weight:600;line-height:1.5;white-space:nowrap;
+}
+.chip .ico{width:11px;height:11px;}
+.c-bad{background:var(--bad-soft);color:var(--bad);}
+.c-warn{background:var(--warn-soft);color:var(--warn);}
+.c-info{background:var(--info-soft);color:var(--info);}
+.c-ok{background:var(--ok-soft);color:var(--ok);}
+.c-ac{background:var(--ac-soft);color:var(--ac-2);}
+.c-mute{background:var(--bg-2);color:var(--tx-2);}
+
+.note{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:12px 14px;border-radius:var(--r2);
+  background:var(--ac-soft);border:1px solid var(--ac-line);
+  font-size:12px;color:var(--tx-1);line-height:1.5;
+}
+.note .ico{color:var(--ac-2);margin-top:1px;}
+.note strong{color:var(--tx-0);font-weight:600;}
+.note.n-warn{background:var(--warn-soft);border-color:var(--warn-line);}
+.note.n-warn .ico{color:var(--warn);}
+
+/* ═══════════════ HERO BANNER (dashboard) ═══════════════ */
+.hero{
+  position:relative;overflow:hidden;
+  background:var(--bg-1);border:1px solid var(--line);
+  border-radius:var(--r4);padding:var(--s6);margin-bottom:var(--s5);
+  display:flex;align-items:center;gap:var(--s6);flex-wrap:wrap;
+}
+.hero::before{
+  content:'';position:absolute;inset:0 auto 0 0;width:3px;
+  background:linear-gradient(180deg,var(--ac),#8B5CF6);
+}
+.hero-main{flex:1;min-width:260px;}
+.hero-eyebrow{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.hero h2{font-size:22px;font-weight:700;letter-spacing:-.025em;line-height:1.25;}
+.hero h2 b{color:var(--ac-2);font-weight:700;}
+.hero p{font-size:12.5px;color:var(--tx-1);margin-top:6px;max-width:62ch;}
+.hero-cta{display:flex;gap:var(--s2);flex-wrap:wrap;}
+
+/* ═══════════════ KPI ═══════════════ */
+.kpis{
+  display:grid;gap:var(--s3);margin-bottom:var(--s5);
+  grid-template-columns:repeat(4,1fr);
+}
+.kpi{
+  background:var(--bg-1);border:1px solid var(--line);
+  border-radius:var(--r3);padding:var(--s4) var(--s5);
+  transition:border-color var(--tr),background var(--tr);
+}
+<<<<<<< HEAD
+.calc-box .c-lbl{font-family:'Inter',sans-serif;font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;font-weight:700;}
+.cl{margin:3px 0;color:var(--text-2);white-space:pre-wrap;}
+
+.cl.tot{border-top:1px solid var(--border);padding-top:8px;margin-top:8px;font-weight:700;color:var(--text-1);}
+.cl.unc{color:var(--text-3);text-decoration:line-through;}
+.cl.err{color:var(--red);margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-family:'Inter',sans-serif;}
+
+/* ═══════════════════════════════════════════════
+   CHECKING LISTS
+═══════════════════════════════════════════════ */
+.ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:20px;}
+.ck-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.ck-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.ck-hdr h3{font-size:14px;font-weight:600;flex:1;}
+.ck-cnt{background:var(--bg-surface);padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;color:var(--text-2);}
+.ck-body{max-height:460px;overflow-y:auto;}
+.ck-item{
+  display:flex;align-items:flex-start;gap:12px;padding:12px 20px;
+  border-bottom:1px solid rgba(255,255,255,.035);cursor:pointer;transition:var(--transition);
+=======
+.kpi:hover{border-color:var(--line-2);background:var(--bg-2);}
+.kpi-hd{display:flex;align-items:center;gap:7px;margin-bottom:10px;color:var(--tx-2);}
+.kpi-hd .ico{width:14px;height:14px;}
+.kpi-val{
+  font-family:var(--mono);font-size:27px;font-weight:700;
+  letter-spacing:-.035em;line-height:1;
+}
+.kpi-sub{font-size:11px;color:var(--tx-2);margin-top:7px;display:flex;align-items:center;gap:5px;}
+.kpi[data-tone="ac"] .kpi-val{color:var(--ac-2);}
+.kpi[data-tone="ok"] .kpi-val{color:var(--ok);}
+.kpi[data-tone="warn"] .kpi-val{color:var(--warn);}
+.kpi[data-tone="bad"] .kpi-val{color:var(--bad);}
+.kpi-action{
+  width:100%;text-align:left;background:none;border:none;
+  font-family:inherit;color:inherit;cursor:pointer;padding:0;
+>>>>>>> origin/master
+}
+
+/* meter */
+.meter{height:5px;border-radius:100px;background:var(--bg-3);overflow:hidden;margin-top:10px;}
+.meter i{display:block;height:100%;border-radius:100px;background:var(--ok);transition:width .7s cubic-bezier(.4,0,.2,1);}
+
+/* ═══════════════ GRIDS ═══════════════ */
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4);}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4);}
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s4);}
+.stack{display:flex;flex-direction:column;gap:var(--s4);}
+
+/* ═══════════════ BAR CHARTS ═══════════════ */
+.bars{display:flex;flex-direction:column;gap:9px;}
+.bar-row{display:flex;align-items:center;gap:10px;}
+.bar-key{
+  width:34px;flex-shrink:0;text-align:right;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+}
+.bar-key.wide{width:96px;text-align:left;font-family:var(--sans);font-weight:500;
+  color:var(--tx-1);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-track{flex:1;height:8px;border-radius:100px;background:var(--bg-3);overflow:hidden;}
+.bar-fill{height:100%;border-radius:100px;transition:width .7s cubic-bezier(.4,0,.2,1);min-width:2px;}
+.bar-num{
+  width:44px;flex-shrink:0;text-align:right;
+  font-family:var(--mono);font-size:11px;color:var(--tx-1);
+}
+.bar-num em{font-style:normal;color:var(--tx-2);font-size:10px;}
+
+/* donut */
+.donut{display:flex;align-items:center;gap:var(--s5);flex-wrap:wrap;}
+.donut svg{width:108px;height:108px;flex-shrink:0;transform:rotate(-90deg);}
+.donut-mid{position:relative;}
+.donut-legend{flex:1;min-width:150px;display:flex;flex-direction:column;gap:6px;}
+.dl{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tx-1);}
+.dl i{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.dl b{margin-left:auto;font-family:var(--mono);color:var(--tx-0);font-weight:600;}
+
+/* ═══════════════ TABLE ═══════════════ */
+.tbl-hd{
+  display:flex;align-items:center;gap:var(--s3);
+  padding:var(--s4) var(--s5);border-bottom:1px solid var(--line);flex-wrap:wrap;
+}
+.tbl-hd h3{flex:1;min-width:150px;}
+.filters{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;}
+.active-filters{
+  display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  padding:10px var(--s5);border-bottom:1px solid var(--line);background:var(--bg-0);
+}
+.fchip{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 6px 3px 9px;
+  border-radius:100px;background:var(--ac-soft);border:1px solid var(--ac-line);
+  color:var(--ac-2);font-size:10.5px;font-weight:600;
+}
+.fchip button{
+  display:grid;place-items:center;width:14px;height:14px;border-radius:50%;
+  background:none;border:none;color:inherit;cursor:pointer;opacity:.7;
+}
+.fchip button:hover{opacity:1;background:var(--ac-line);}
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;}
+thead th{
+  position:sticky;top:0;z-index:2;
+  padding:10px 14px;text-align:left;white-space:nowrap;
+  background:var(--bg-2);border-bottom:1px solid var(--line);
+  font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--tx-2);user-select:none;
+}
+th.sortable{cursor:pointer;transition:color var(--tr);}
+th.sortable:hover{color:var(--tx-0);}
+th .th-in{display:inline-flex;align-items:center;gap:4px;}
+th .ico{width:12px;height:12px;opacity:0;transition:opacity var(--tr);}
+th.sortable:hover .ico{opacity:.5;}
+th[aria-sort] .ico{opacity:1;color:var(--ac-2);}
+th.num{text-align:right;}
+tbody td{padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap;}
+tbody tr{cursor:pointer;transition:background var(--tr);}
+tbody tr:hover{background:var(--bg-2);}
+tbody tr:focus-visible{background:var(--bg-2);outline:2px solid var(--ac-2);outline-offset:-2px;}
+tbody tr:last-child td{border-bottom:none;}
+td.num{text-align:right;}
+.cell-id{font-family:var(--mono);font-size:11px;color:var(--tx-2);}
+.cell-name{font-weight:550;}
+.gp-cell{font-family:var(--mono);font-size:11.5px;color:var(--tx-1);}
+.gp-cell.zero{color:var(--bad);font-weight:600;}
+.gpa-val{font-family:var(--mono);font-size:13.5px;font-weight:700;}
+.gpa-val.f{color:var(--bad);}
+.gpa-raw{font-family:var(--mono);font-size:9.5px;color:var(--tx-2);display:block;}
+.flag-set{display:flex;gap:4px;}
+.tbl-ft{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+  padding:11px var(--s5);border-top:1px solid var(--line);
+  font-size:11.5px;color:var(--tx-2);flex-wrap:wrap;
+}
+
+/* ═══════════════ CHECKING LISTS ═══════════════ */
+.ck-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4);}
+.ck-card{
+  background:var(--bg-1);border:1px solid var(--line);
+  border-radius:var(--r3);overflow:hidden;display:flex;flex-direction:column;
+}
+.ck-hd{
+  display:flex;align-items:center;gap:11px;
+  padding:var(--s4) var(--s5);border-bottom:1px solid var(--line);
+}
+.ck-ic{
+  width:32px;height:32px;border-radius:var(--r2);display:grid;place-items:center;
+  background:var(--tone-soft);color:var(--tone);flex-shrink:0;
+}
+.ck-hd-t{flex:1;min-width:0;}
+.ck-hd-t h3{font-size:13.5px;font-weight:620;}
+.ck-hd-t p{font-size:11px;color:var(--tx-2);margin-top:1px;}
+.ck-cnt{
+  font-family:var(--mono);font-size:15px;font-weight:700;color:var(--tone);
+  background:var(--tone-soft);border:1px solid var(--tone-line);
+  padding:3px 10px;border-radius:var(--r1);
+}
+.ck-body{max-height:420px;overflow-y:auto;flex:1;}
+.ck-item{
+  display:flex;align-items:flex-start;gap:11px;
+  padding:11px var(--s5);border-bottom:1px solid var(--line);
+  cursor:pointer;transition:background var(--tr);width:100%;
+  background:none;border-left:none;border-right:none;border-top:none;
+  font-family:inherit;text-align:left;color:inherit;
+}
+.ck-item:hover{background:var(--bg-2);}
+.ck-item:last-child{border-bottom:none;}
+.ck-item-id{
+  font-family:var(--mono);font-size:10.5px;color:var(--tx-2);
+  width:46px;flex-shrink:0;padding-top:2px;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.ck-item-b{flex:1;min-width:0;}
+.ck-item-n{font-size:12.5px;font-weight:550;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.ck-item-n span{font-size:10.5px;color:var(--tx-2);font-weight:400;}
+.ck-item-w{font-size:11px;color:var(--tx-1);margin-top:3px;line-height:1.45;white-space:normal;}
+.tone-opt{--tone:var(--info);--tone-soft:var(--info-soft);--tone-line:var(--info-line);}
+.tone-prac{--tone:var(--warn);--tone-soft:var(--warn-soft);--tone-line:var(--warn-line);}
+.tone-ab{--tone:var(--ac-2);--tone-soft:var(--ac-soft);--tone-line:var(--ac-line);}
+.tone-data{--tone:var(--bad);--tone-soft:var(--bad-soft);--tone-line:var(--bad-line);}
+
+/* ═══════════════ MODAL ═══════════════ */
+.overlay{
+  display:none;position:fixed;inset:0;z-index:900;
+  background:rgba(6,8,12,.72);backdrop-filter:blur(4px);
+  align-items:flex-start;justify-content:center;padding:var(--s6);overflow-y:auto;
+}
+.overlay.open{display:flex;animation:fade .18s ease;}
+.modal{
+  background:var(--bg-1);border:1px solid var(--line-2);
+  border-radius:var(--r4);width:100%;max-width:940px;margin:auto;
+  box-shadow:var(--e3);animation:pop .22s cubic-bezier(.4,0,.2,1);
+}
+@keyframes pop{from{opacity:0;transform:translateY(-10px) scale(.985);}to{opacity:1;transform:none;}}
+.modal-hd{
+  display:flex;align-items:center;gap:var(--s4);
+  padding:var(--s5) var(--s6);border-bottom:1px solid var(--line);
+}
+.m-av{
+  width:42px;height:42px;border-radius:var(--r2);flex-shrink:0;
+  display:grid;place-items:center;font-family:var(--mono);
+  font-size:15px;font-weight:700;color:#fff;
+}
+.m-t{flex:1;min-width:0;}
+.m-t h2{font-size:17px;font-weight:680;letter-spacing:-.02em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.m-t p{font-size:11.5px;color:var(--tx-2);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.modal-bd{padding:var(--s6);}
+
+.verdict{
+  display:flex;gap:var(--s6);align-items:center;flex-wrap:wrap;
+  padding:var(--s5);border-radius:var(--r3);
+  background:var(--bg-2);border:1px solid var(--line);margin-bottom:var(--s5);
+}
+.verdict-gpa{flex-shrink:0;}
+.verdict-gpa .n{
+  font-family:var(--mono);font-size:44px;font-weight:800;
+  letter-spacing:-.05em;line-height:1;
+}
+.verdict-gpa .n.f{color:var(--bad);}
+.verdict-gpa .raw{font-size:10.5px;color:var(--tx-2);margin-top:5px;}
+.verdict-facts{display:flex;gap:var(--s6);flex-wrap:wrap;flex:1;}
+.fact .t-label{margin-bottom:4px;}
+.fact-v{font-size:13.5px;font-weight:600;font-family:var(--mono);}
+.verdict-flags{display:flex;flex-direction:column;gap:6px;align-items:flex-end;margin-left:auto;}
+.fp{
+  display:inline-flex;align-items:center;gap:6px;max-width:340px;
+  padding:5px 11px;border-radius:100px;font-size:11px;font-weight:550;line-height:1.4;
+}
+.fp .ico{width:12px;height:12px;flex-shrink:0;}
+.fp-bad{background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad-line);}
+.fp-warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line);}
+.fp-info{background:var(--info-soft);color:var(--info);border:1px solid var(--info-line);}
+.fp-ac{background:var(--ac-soft);color:var(--ac-2);border:1px solid var(--ac-line);}
+
+.trace-tbl{
+  width:100%;border-collapse:separate;border-spacing:0;font-size:12px;
+  border:1px solid var(--line);border-radius:var(--r2);overflow:hidden;
+}
+.trace-tbl th{
+  position:static;background:var(--bg-2);padding:9px 13px;
+  font-size:9.5px;letter-spacing:.08em;
+}
+.trace-tbl td{padding:10px 13px;border-bottom:1px solid var(--line);
+  vertical-align:top;white-space:normal;}
+.trace-tbl tbody tr:last-child td{border-bottom:none;}
+.trace-tbl tbody tr{cursor:default;}
+.trace-tbl tbody tr:hover{background:transparent;}
+.tr-bad{background:rgba(239,68,68,.045);}
+.tr-warn{background:rgba(245,158,11,.045);}
+.tr-opt{background:rgba(56,189,248,.035);}
+.tr-bad td:first-child{box-shadow:inset 3px 0 0 var(--bad);}
+.tr-warn td:first-child{box-shadow:inset 3px 0 0 var(--warn);}
+.tr-opt td:first-child{box-shadow:inset 3px 0 0 var(--info);}
+.sub-code{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--ac-2);}
+.sub-name{font-size:10.5px;color:var(--tx-2);display:block;margin-top:1px;}
+.rule-txt{font-size:11px;color:var(--tx-1);line-height:1.45;}
+.mark-txt{font-family:var(--mono);font-size:11.5px;}
+.gp-big{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ok);}
+.gp-zero{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--bad);}
+.gp-note{font-size:9.5px;color:var(--tx-2);display:block;margin-top:2px;}
+
+.calc{
+  margin-top:var(--s4);background:var(--bg-2);border:1px solid var(--line);
+  border-radius:var(--r2);padding:var(--s4) var(--s5);
+  font-family:var(--mono);font-size:11.5px;
+}
+.cl{margin:3px 0;color:var(--tx-1);white-space:pre-wrap;}
+.cl.tot{border-top:1px solid var(--line);padding-top:8px;margin-top:8px;font-weight:600;color:var(--tx-0);}
+.cl.unc{opacity:.45;text-decoration:line-through;}
+.cl.err{
+  color:var(--bad);margin-top:11px;padding-top:11px;
+  border-top:1px solid var(--line);font-family:var(--sans);
+  font-size:11.5px;line-height:1.5;white-space:normal;
+}
+
+/* ═══════════════ LOAD SCREEN ═══════════════ */
+#load-screen{min-height:calc(100vh - var(--hdr-h));display:grid;place-items:center;padding:var(--s6);}
+.load-card{
+  width:100%;max-width:520px;text-align:center;
+  background:var(--bg-1);border:1px solid var(--line);
+  border-radius:var(--r5);padding:var(--s8) var(--s7);box-shadow:var(--e2);
+}
+.load-mark{
+  width:52px;height:52px;margin:0 auto var(--s4);border-radius:var(--r3);
+  background:linear-gradient(140deg,var(--ac),#8B5CF6);
+  display:grid;place-items:center;color:#fff;box-shadow:0 6px 22px rgba(99,102,241,.35);
+}
+.load-card h2{font-size:21px;font-weight:700;letter-spacing:-.025em;}
+.load-card > p{font-size:12.5px;color:var(--tx-1);margin-top:8px;line-height:1.6;}
+.dz{
+  margin:var(--s6) 0 var(--s4);padding:var(--s7) var(--s5);
+  border:1.5px dashed var(--line-2);border-radius:var(--r3);
+  cursor:pointer;transition:border-color var(--tr),background var(--tr);
+}
+.dz:hover,.dz.over{border-color:var(--ac);background:var(--ac-soft);}
+.dz .ico{color:var(--tx-2);margin:0 auto 10px;width:26px;height:26px;}
+.dz:hover .ico,.dz.over .ico{color:var(--ac-2);}
+.dz h3{font-size:13.5px;font-weight:600;}
+.dz p{font-size:11.5px;color:var(--tx-2);margin-top:3px;}
+#file-input{display:none;}
+.load-actions{display:flex;flex-direction:column;gap:var(--s2);}
+.load-status{
+  margin-top:var(--s5);padding-top:var(--s4);border-top:1px solid var(--line);
+  font-size:11.5px;color:var(--tx-2);line-height:1.55;
+}
+.load-status code{
+  font-family:var(--mono);font-size:10.5px;
+  background:var(--bg-3);padding:2px 5px;border-radius:4px;color:var(--tx-1);
+}
+.load-status.warn{color:var(--warn);}
+
+/* ═══════════════ STATES ═══════════════ */
+.empty{
+  padding:var(--s8) var(--s5);text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:var(--s3);
+}
+.empty-ic{
+  width:44px;height:44px;border-radius:var(--r3);display:grid;place-items:center;
+  background:var(--bg-2);color:var(--tx-2);border:1px solid var(--line);
+}
+.empty h4{font-size:13.5px;font-weight:600;}
+.empty p{font-size:12px;color:var(--tx-2);max-width:38ch;}
+
+.skel{
+  background:linear-gradient(90deg,var(--bg-2) 25%,var(--bg-3) 50%,var(--bg-2) 75%);
+  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:var(--r1);
+}
+@keyframes sh{from{background-position:200% 0;}to{background-position:-200% 0;}}
+.skel-kpi{height:96px;border-radius:var(--r3);}
+.skel-card{height:250px;border-radius:var(--r3);}
+
+#busy{
+  display:none;position:fixed;inset:0;z-index:1200;
+  background:rgba(10,12,17,.86);backdrop-filter:blur(6px);
+  place-items:center;text-align:center;
+}
+#busy.on{display:grid;}
+.busy-box{display:flex;flex-direction:column;align-items:center;gap:var(--s4);}
+.spin{
+  width:34px;height:34px;border-radius:50%;
+  border:2.5px solid var(--line-2);border-top-color:var(--ac);
+  animation:sp .7s linear infinite;
+}
+@keyframes sp{to{transform:rotate(360deg);}}
+.busy-box p{font-size:13px;font-weight:550;}
+.busy-box small{font-size:11.5px;color:var(--tx-2);}
+
+#toasts{
+  position:fixed;z-index:1300;right:var(--s6);bottom:var(--s6);
+  display:flex;flex-direction:column;gap:var(--s2);max-width:min(380px,calc(100vw - 32px));
+}
+.toast{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;border-radius:var(--r2);
+  background:var(--bg-2);border:1px solid var(--line-2);
+  box-shadow:var(--e2);animation:tin .24s cubic-bezier(.4,0,.2,1);
+}
+@keyframes tin{from{opacity:0;transform:translateY(10px) scale(.97);}to{opacity:1;transform:none;}}
+.toast.out{opacity:0;transform:translateY(6px);transition:all .2s ease;}
+.toast .ico{flex-shrink:0;margin-top:1px;}
+.toast-b{flex:1;min-width:0;}
+.toast-b strong{display:block;font-size:12.5px;font-weight:600;}
+.toast-b span{font-size:11.5px;color:var(--tx-1);line-height:1.45;display:block;margin-top:1px;}
+.toast-x{background:none;border:none;color:var(--tx-2);cursor:pointer;padding:0;display:grid;place-items:center;}
+.toast-x:hover{color:var(--tx-0);}
+.t-ok-b{border-left:3px solid var(--ok);} .t-ok-b .ico{color:var(--ok);}
+.t-bad-b{border-left:3px solid var(--bad);} .t-bad-b .ico{color:var(--bad);}
+.t-info-b{border-left:3px solid var(--ac);} .t-info-b .ico{color:var(--ac-2);}
+.t-warn-b{border-left:3px solid var(--warn);} .t-warn-b .ico{color:var(--warn);}
+
+/* ═══════════════ VALIDATE TAB ═══════════════ */
+.val-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--s4);align-items:start;}
+.ta{
+  width:100%;height:250px;padding:14px;resize:vertical;
+  background:var(--bg-0);border:1px solid var(--line);border-radius:var(--r2);
+  color:var(--tx-0);font-family:var(--mono);font-size:11.5px;line-height:1.6;outline:none;
+  transition:border-color var(--tr);
+}
+.ta:focus{border-color:var(--ac-line);}
+.val-actions{display:flex;gap:var(--s2);margin-top:var(--s3);flex-wrap:wrap;}
+.rej-hd{
+  display:flex;align-items:center;gap:10px;padding:13px var(--s5);
+  border-bottom:1px solid var(--line);background:var(--bad-soft);
+  color:var(--bad);font-size:13px;font-weight:650;
+}
+.rej-item{padding:12px var(--s5);border-bottom:1px solid var(--line);}
+.rej-item:last-child{border-bottom:none;}
+.rej-top{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:550;flex-wrap:wrap;}
+.rej-id{font-family:var(--mono);color:var(--warn);font-size:11px;}
+.rej-r{
+  font-family:var(--mono);font-size:10.5px;color:var(--tx-1);
+  margin-top:5px;padding-left:12px;position:relative;line-height:1.55;
+}
+.rej-r::before{content:'';position:absolute;left:2px;top:7px;width:4px;height:4px;
+  border-radius:50%;background:var(--bad);}
+.ok-box{
+  padding:var(--s7) var(--s5);text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:var(--s3);
+}
+.ok-ic{
+  width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+  background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line);
+}
+.ok-box h4{font-size:14.5px;font-weight:650;color:var(--ok);}
+.ok-box p{font-size:12px;color:var(--tx-2);}
+
+/* ═══════════════ PRINT ═══════════════ */
+#print-area{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #print-area,#print-area *{visibility:visible;}
+  #print-area{display:block!important;position:absolute;top:0;left:0;width:100%;}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════ */
+@media (max-width:1180px){
+  .kpis{grid-template-columns:repeat(2,1fr);}
+  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media (max-width:960px){
+  .grid-2,.grid-3,.ck-grid,.val-grid{grid-template-columns:minmax(0,1fr);}
+  /* the table starts scrolling here, so pin identity to the left edge */
+  tbody td:first-child,thead th:first-child{
+    position:sticky;left:0;z-index:1;background:var(--bg-1);
+  }
+  thead th:first-child{z-index:3;background:var(--bg-2);}
+  tbody tr:hover td:first-child{background:var(--bg-2);}
+}
+@media (max-width:720px){
+  /* ID is hidden below this width, so the name becomes the pinned column */
+  tbody td:first-child,thead th:first-child{position:static;}
+  tbody td:nth-child(2),thead th:nth-child(2){
+    position:sticky;left:0;z-index:1;background:var(--bg-1);
+  }
+  thead th:nth-child(2){z-index:3;background:var(--bg-2);}
+  tbody tr:hover td:nth-child(2){background:var(--bg-2);}
+  .hdr-in,.nav-in,.wrap{padding-left:var(--s4);padding-right:var(--s4);}
+  .brand-txt p{display:none;}
+  .verdict-flags{margin-left:0;align-items:flex-start;width:100%;}
+  .hero{padding:var(--s5);}
+  .hero h2{font-size:19px;}
+}
+@media (max-width:720px){
+  :root{--hdr-h:56px;--nav-h:50px;}
+  /* per-subject grade points live in the trace; on a phone the row should
+     lead with who the student is and what they got */
+  /* a phone row leads with the name and the verdict; the rest is in the trace */
+  .col-sub,.col-class,.col-opt,.col-id{display:none;}
+  thead th,tbody td{padding-left:10px;padding-right:10px;}
+  .flag-set .chip-l{display:none;}
+  .flag-set .chip{padding:4px;}
+  .flag-set .chip .ico{width:13px;height:13px;}
+  .wrap{padding:var(--s4) var(--s3);}
+  .hide-sm{display:none!important;}
+  .btn-lbl{display:none;}
+  .btn{padding:0 10px;}
+  .btn-icon{width:34px;}
+  .kpis{grid-template-columns:repeat(2,1fr);gap:var(--s2);}
+  .kpi{padding:var(--s3) var(--s4);}
+  .kpi-val{font-size:22px;}
+  .hero{flex-direction:column;align-items:flex-start;gap:var(--s4);}
+  .hero-cta{width:100%;}
+  .hero-cta .btn{flex:1;}
+  .overlay{padding:0;}
+  .modal{max-width:none;border-radius:0;min-height:100vh;border:none;}
+  .modal-hd,.modal-bd{padding:var(--s4);}
+  .verdict{padding:var(--s4);gap:var(--s4);}
+  .verdict-gpa .n{font-size:34px;}
+  .sec-t h2{font-size:17px;}
+  .filters{width:100%;}
+  .filters .field,.filters .search-wrap{flex:1;min-width:130px;}
+  #toasts{left:var(--s3);right:var(--s3);bottom:var(--s3);max-width:none;}
+}
+@media (max-width:340px){
+  .kpis{grid-template-columns:1fr;}
+}
+@media (max-width:520px){
+  .load-card{padding:var(--s6) var(--s4);}
+  .verdict-facts{gap:var(--s4);}
+  .donut{justify-content:center;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ HEADER ══════════════════ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="brand">
+      <div class="brand-mark" id="brand-mark"></div>
+      <div class="brand-txt">
+        <h1>Result Engine</h1>
+        <p>SSC grading · rules R-10 · R-11 · R-12 · R-13 · R-29</p>
+      </div>
+    </div>
+    <div class="hdr-gap"></div>
+    <div class="hdr-actions">
+      <div class="casepick" id="cs-wrap" style="display:none;">
+        <label class="t-label hide-sm" for="cs-sel">Case</label>
+        <select class="field" id="cs-sel" aria-label="Select test case"></select>
+      </div>
+      <button class="btn btn-ghost" id="btn-print" style="display:none;" onclick="openPrintSelector()">
+        <span class="ico-slot" data-ico="printer"></span><span class="btn-lbl">Marksheet</span>
+      </button>
+      <button class="btn btn-ghost" id="btn-load" style="display:none;" onclick="resetApp()">
+        <span class="ico-slot" data-ico="folder"></span><span class="btn-lbl">Load file</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════ NAV ══════════════════ -->
+<nav class="nav" id="nav" style="display:none;" aria-label="Sections">
+  <div class="nav-in" role="tablist">
+    <button class="tab-btn active" data-tab="dashboard" role="tab" aria-selected="true" onclick="switchTab('dashboard')">
+      <span class="ico-slot" data-ico="grid"></span>Overview
+    </button>
+    <button class="tab-btn" data-tab="students" role="tab" aria-selected="false" onclick="switchTab('students')">
+      <span class="ico-slot" data-ico="users"></span>Students
+      <span class="tbadge" id="bdg-s">0</span>
+    </button>
+    <button class="tab-btn" data-tab="checking" role="tab" aria-selected="false" onclick="switchTab('checking')">
+      <span class="ico-slot" data-ico="clipboard"></span>Verification
+      <span class="tbadge" id="bdg-c">0</span>
+    </button>
+    <button class="tab-btn" data-tab="summary" role="tab" aria-selected="false" onclick="switchTab('summary')">
+      <span class="ico-slot" data-ico="chart"></span>Class summary
+    </button>
+    <button class="tab-btn" data-tab="upload" role="tab" aria-selected="false" onclick="switchTab('upload')">
+      <span class="ico-slot" data-ico="shield"></span>Validate file
+    </button>
+  </div>
+</nav>
+
+<!-- ══════════════════ LOAD SCREEN ══════════════════ -->
+<div id="load-screen">
+  <div class="load-card">
+    <div class="load-mark" id="load-mark"></div>
+    <h2>Process a marks sheet</h2>
+    <p>Grades every student against the SSC rules, shows the rule behind each mark, and lists the results a teacher must verify by hand.</p>
+
+    <div class="dz" id="drop-zone" tabindex="0" role="button" aria-label="Drop a JSON marks file here or press Enter to browse">
+      <span class="ico-slot" data-ico="upload"></span>
+      <h3>Drop a marks file here</h3>
+      <p>JSON following the P08 schema</p>
+    </div>
+<<<<<<< HEAD
+    <input type="file" id="file-input" accept=".json" onchange="handleFile(event)">
+    <button class="btn btn-pri" style="width:100%;justify-content:center;font-size:13px;padding:10px;" onclick="document.getElementById('file-input').click()">
+      📂 Browse for File
+    </button>
+    <button class="btn btn-ghost" id="btn-back-home" style="display:none;width:100%;justify-content:center;font-size:13px;padding:10px;margin-top:10px;" onclick="goHome()">
+      ⬅️ Back to Home / Dashboard
+    </button>
+<button class="btn btn-ghost" id="btn-builtin" style="display:none;width:100%;justify-content:center;font-size:13px;padding:10px;margin-top:10px;" onclick="loadBuiltIn()">
+      📚 Use built-in dataset (60 students, 2 classes)
+    </button>
+    <p id="load-status" style="margin-top:14px;font-size:11px;color:var(--text-3);">Looking for a marks file next to this page…</p>
+
+=======
+    <input type="file" id="file-input" accept=".json,application/json" onchange="handleFile(event)">
+
+    <div class="load-actions">
+      <button class="btn btn-pri btn-lg" onclick="document.getElementById('file-input').click()">
+        <span class="ico-slot" data-ico="folder"></span>Browse for a file
+      </button>
+      <button class="btn btn-ghost btn-lg" id="btn-builtin" style="display:none;" onclick="loadBuiltIn()">
+        <span class="ico-slot" data-ico="database"></span>Use the built-in dataset · 60 students
+      </button>
+      <button class="btn btn-quiet" id="btn-back-home" style="display:none;" onclick="goHome()">
+        <span class="ico-slot" data-ico="arrow-left"></span>Back to results
+      </button>
+    </div>
+
+    <p class="load-status" id="load-status">Looking for a marks file next to this page…</p>
+>>>>>>> origin/master
+  </div>
+</div>
+
+<!-- ══════════════════ APP ══════════════════ -->
+<main id="app" style="display:none;">
+  <div class="wrap">
+
+    <!-- OVERVIEW -->
+    <section class="tab-panel active" id="tab-dashboard" role="tabpanel">
+      <div id="dash-hero"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="grid-2" id="dash-charts" style="margin-bottom:var(--s4);"></div>
+      <div id="dash-queue"></div>
+    </section>
+
+<<<<<<< HEAD
+    <!-- TAB 2: STUDENTS -->
+    <div class="tab-panel" id="tab-students">
+      <div class="tbl-wrap">
+        <div class="tbl-bar">
+          <h2>Student Results</h2>
+          <input type="text" class="si si-w" id="q-search" placeholder="🔍 Search name / ID…" oninput="filterStudents()">
+          <select class="si sel" id="q-class" onchange="filterStudents()">
+            <option value="">All Classes</option>
+          </select>
+          <select class="si sel" id="q-result" onchange="filterStudents()">
+            <option value="">All Results</option>
+            <option value="PASS">Pass Only</option>
+            <option value="FAIL">Fail Only</option>
+          </select>
+          <select class="si sel" id="q-grade" onchange="filterStudents()">
+            <option value="">All Grades</option>
+            <option>A+</option><option>A</option><option>A-</option>
+            <option>B</option><option>C</option><option>D</option><option>F</option>
+          </select>
+          <select class="si sel" id="q-flag" onchange="filterStudents()">
+            <option value="">All Students</option>
+            <option value="absent">Has AB</option>
+            <option value="prac">Practical Fail</option>
+            <option value="opt">Optional ≤ 2.0</option>
+<option value="data">Data Problem</option>
+
+          </select>
+=======
+    <!-- STUDENTS -->
+    <section class="tab-panel" id="tab-students" role="tabpanel">
+      <div class="card">
+        <div class="tbl-hd">
+          <h3 class="t-h2">Student results</h3>
+          <div class="filters">
+            <div class="search-wrap">
+              <span class="ico-slot" data-ico="search"></span>
+              <input type="text" class="field" id="q-search" placeholder="Search name or ID" oninput="filterStudents()" aria-label="Search students">
+            </div>
+            <select class="field" id="q-class" onchange="filterStudents()" aria-label="Filter by class">
+              <option value="">All classes</option>
+            </select>
+            <select class="field" id="q-result" onchange="filterStudents()" aria-label="Filter by result">
+              <option value="">All results</option>
+              <option value="PASS">Passed</option>
+              <option value="FAIL">Failed</option>
+            </select>
+            <select class="field" id="q-grade" onchange="filterStudents()" aria-label="Filter by grade">
+              <option value="">All grades</option>
+              <option>A+</option><option>A</option><option>A-</option>
+              <option>B</option><option>C</option><option>D</option><option>F</option>
+            </select>
+            <select class="field" id="q-flag" onchange="filterStudents()" aria-label="Filter by verification flag">
+              <option value="">All flags</option>
+              <option value="opt">Optional ≤ 2.0</option>
+              <option value="prac">Practical fail</option>
+              <option value="absent">Absent mark</option>
+              <option value="data">Data problem</option>
+            </select>
+          </div>
+>>>>>>> origin/master
+        </div>
+        <div id="active-filters"></div>
+        <div class="tbl-scroll">
+          <table id="stbl">
+            <thead><tr id="sthead"></tr></thead>
+            <tbody id="stbody"></tbody>
+          </table>
+        </div>
+        <div class="tbl-ft" id="tbl-ft"></div>
+      </div>
+    </section>
+
+    <!-- VERIFICATION -->
+    <section class="tab-panel" id="tab-checking" role="tabpanel">
+      <div class="sec">
+        <div class="sec-t">
+          <h2>Verification queue</h2>
+          <p>Results the office must confirm by hand before publishing. Select any row to open its full rule trace.</p>
+        </div>
+        <button class="btn btn-ghost" onclick="openPrintSelector()">
+          <span class="ico-slot" data-ico="printer"></span>Print a marksheet
+        </button>
+      </div>
+      <div class="note" style="margin-bottom:var(--s5);">
+        <span class="ico-slot" data-ico="info"></span>
+        <div><strong>R-29.</strong> A student can appear on more than one list — an absent optional subject, for example, lands on both the optional and the absent list. Every list is checked independently.</div>
+      </div>
+      <div class="ck-grid" id="ck-grid"></div>
+    </section>
+
+    <!-- SUMMARY -->
+    <section class="tab-panel" id="tab-summary" role="tabpanel">
+      <div class="sec">
+        <div class="sec-t">
+          <h2>Class summary</h2>
+          <p>Pass rates, grade distribution and subject-level failure analysis per class.</p>
+        </div>
+      </div>
+      <div class="grid-2" id="sum-grid"></div>
+    </section>
+
+    <!-- VALIDATE -->
+    <section class="tab-panel" id="tab-upload" role="tabpanel">
+      <div class="sec">
+        <div class="sec-t">
+          <h2>Validate a marks file</h2>
+          <p>Check a file for malformed rows before importing it. Every rejection names the student and the exact reason.</p>
+        </div>
+      </div>
+      <div class="val-grid">
+        <div class="card">
+          <div class="card-hd"><h3 class="t-h2">Input</h3></div>
+          <div class="card-bd">
+            <textarea class="ta" id="paste-ta" spellcheck="false" aria-label="Paste marks JSON"
+              placeholder='Paste case JSON here…&#10;&#10;Accepts a full file {"cases":[…]} or a single case {"students":[…]}'></textarea>
+            <div class="val-actions">
+              <button class="btn btn-pri" onclick="validatePasted()">
+                <span class="ico-slot" data-ico="shield"></span>Validate
+              </button>
+              <button class="btn btn-warn" onclick="loadAdversarialSample()">
+                <span class="ico-slot" data-ico="alert"></span>Load adversarial sample
+              </button>
+              <button class="btn btn-quiet" onclick="clearValidator()">Clear</button>
+            </div>
+          </div>
+        </div>
+        <div id="val-out"></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ══════════════════ STUDENT TRACE MODAL ══════════════════ -->
+<div class="overlay" id="s-modal" onclick="closeOverlay('s-modal',event)" role="dialog" aria-modal="true" aria-labelledby="m-name">
+  <div class="modal">
+    <div class="modal-hd">
+      <div class="m-av" id="m-av"></div>
+      <div class="m-t">
+        <h2 id="m-name"></h2>
+        <p id="m-meta"></p>
+      </div>
+      <button class="btn btn-ghost hide-sm" onclick="printCurrent()">
+        <span class="ico-slot" data-ico="printer"></span>Marksheet
+      </button>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('s-modal')" aria-label="Close">
+        <span class="ico-slot" data-ico="close"></span>
+      </button>
+    </div>
+    <div class="modal-bd" id="m-body"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ PRINT PICKER ══════════════════ -->
+<div class="overlay" id="p-modal" onclick="closeOverlay('p-modal',event)" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-hd">
+      <div class="m-t"><h2>Print a marksheet</h2><p>Pick a student</p></div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('p-modal')" aria-label="Close">
+        <span class="ico-slot" data-ico="close"></span>
+      </button>
+    </div>
+    <div class="modal-bd">
+      <div class="search-wrap" style="margin-bottom:var(--s3);">
+        <span class="ico-slot" data-ico="search"></span>
+        <input type="text" class="field" style="width:100%;" placeholder="Search name or ID" oninput="filterPrintList(this.value)" aria-label="Search students to print">
+      </div>
+      <div id="plist" style="max-height:420px;overflow-y:auto;margin:0 calc(var(--s6) * -1) calc(var(--s6) * -1);"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ GLOBAL STATES ══════════════════ -->
+<div id="busy" role="status" aria-live="polite">
+  <div class="busy-box">
+    <div class="spin"></div>
+    <p id="busy-msg">Processing results…</p>
+    <small id="busy-sub">Applying the grading rules to every student</small>
+  </div>
+</div>
+<div id="toasts" role="status" aria-live="polite"></div>
+<div id="print-area"></div>
+
+<script>
+/* ╔═══════════════════════════════════════════════════════╗
+║  OUTPUT ENCODING                                      ║
+   ║  Every value that originates in the input file must   ║
+   ║  pass through esc() before it reaches innerHTML —     ║
+   ║  render paths included, not just the validator.       ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  if (typeof str !== 'string') str = String(str);
+  return str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[tag] || tag));
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+
+   ║  RULES ENGINE                                         ║
+   ╚═══════════════════════════════════════════════════════╝ */
+
+function markToGP(total) {
+  if (total >= 80) return 5.0;
+  if (total >= 70) return 4.0;
+  if (total >= 60) return 3.5;
+  if (total >= 50) return 3.0;
+  if (total >= 40) return 2.0;
+  if (total >= 33) return 1.0;
+  return 0.0;
+}
+
+function gpToLetter(gpa) {
+  if (gpa >= 5.00) return "A+";
+  if (gpa >= 4.00) return "A";
+  if (gpa >= 3.50) return "A-";
+  if (gpa >= 3.00) return "B";
+  if (gpa >= 2.00) return "C";
+  if (gpa >= 1.00) return "D";
+  return "F";
+}
+
+function gpRange(total) {
+  if (total >= 80) return "80–100 → GP 5.0";
+  if (total >= 70) return "70–79 → GP 4.0";
+  if (total >= 60) return "60–69 → GP 3.5";
+  if (total >= 50) return "50–59 → GP 3.0";
+  if (total >= 40) return "40–49 → GP 2.0";
+  if (total >= 33) return "33–39 → GP 1.0";
+  return "< 33 → GP 0.0 (Fail)";
+}
+
+/* ── Input integrity (D-rules) ────────────────────────────
+   The processing path applies the SAME checks as the validation
+   tab, so a malformed file can never be graded silently.
+     D-1  mark absent from the file      → GP 0, flagged, F if compulsory
+     D-2  mark of the wrong type         → GP 0, flagged, F if compulsory
+     D-3  mark outside its legal range   → clamped to range, flagged
+     D-4  subject code not in the schema → ignored, flagged
+──────────────────────────────────────────────────────── */
+function isNum(v) { return typeof v === 'number' && isFinite(v); }
+function clampTo(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function dataErrorResult(code, subjectType, isOptional, issues, shown) {
+  return {
+    code, absent: false, dataError: true, gp: 0,
+    total: null, theory: null, practical: null,
+    fail: true, practicalFail: false, theoryFail: false,
+    issues,
+    failReason: issues.join('; '),
+    rule: `D: unusable mark (${shown}) → GP 0.0${isOptional ? '; contributes 0 to GPA' : '; overall result = F'} — office must supply a valid mark before publishing`
+  };
+}
+
+/**
+ * Process a single subject mark.
+ * `present` is false when the student's marks object has no entry for this code.
+ */
+function processSubject(code, mark, meta, isOptional, present = true) {
+  const subjectType = isOptional ? "optional" : "compulsory";
+  const issues = [];
+
+  // MISSING MARK (D-1)
+  if (!present || mark === undefined || mark === null) {
+    return dataErrorResult(code, subjectType, isOptional,
+      [`No mark supplied for ${subjectType} subject ${code}`], 'missing');
+  }
+
+
+  // ABSENT (R-12)
+  if (mark === "AB") {
+    return {
+      code, absent: true, gp: 0,
+      total: null, theory: null, practical: null,
+      fail: true, practicalFail: false, theoryFail: false,
+issues: [],
+
+      failReason: "Absent (AB)",
+      rule: `R-12: Absent in ${subjectType} subject → GP 0.0${isOptional ? '; contributes 0 to GPA' : '; overall result = F'}`
+    };
+  }
+
+  // PRACTICAL SUBJECT (R-11)
+  if (meta && meta.practical) {
+if (typeof mark !== 'object' || Array.isArray(mark)) {
+      return dataErrorResult(code, subjectType, isOptional,
+        [`${code}: expected {theory, practical}, got ${JSON.stringify(mark)}`], JSON.stringify(mark));
+    }
+    let T = mark.theory, P = mark.practical;
+    if (!isNum(T) || !isNum(P)) {
+      const bad = [];
+      if (!isNum(T)) bad.push(`theory ${JSON.stringify(mark.theory)} is not a number`);
+      if (!isNum(P)) bad.push(`practical ${JSON.stringify(mark.practical)} is not a number`);
+      return dataErrorResult(code, subjectType, isOptional,
+        bad.map(b => `${code}: ${b}`), JSON.stringify(mark));                       // D-2
+    }
+    if (T < 0 || T > 75) {                                                          // D-3
+      const c = clampTo(T, 0, 75);
+      issues.push(`${code}: theory ${T} outside 0–75, clamped to ${c}`);
+      T = c;
+    }
+    if (P < 0 || P > 25) {
+      const c = clampTo(P, 0, 25);
+      issues.push(`${code}: practical ${P} outside 0–25, clamped to ${c}`);
+      P = c;
+    }
+
+    const total = T + P;
+    const tFail = T < 25;
+    const pFail = P < 8;
+    const clampNote = issues.length ? ` [${issues.join('; ')}]` : '';
+
+
+    if (tFail || pFail) {
+      const gpIfPassed = markToGP(total);
+      let failReason = [];
+      if (tFail) failReason.push(`theory ${T}/75 < 25`);
+      if (pFail)  failReason.push(`practical ${P}/25 < 8`);
+      return {
+        code, absent: false, gp: 0,
+        total, theory: T, practical: P,
+        fail: true, practicalFail: pFail, theoryFail: tFail,
+gpIfPassed, issues,
+        failReason: failReason.join(' AND '),
+        rule: `R-11: Both parts must pass independently. Failed ${failReason.join('; ')} → GP 0.0 (total mark ${total} would give GP ${gpIfPassed.toFixed(1)} if passed)${clampNote}`
+
+      };
+    }
+
+    const gp = markToGP(total);
+    return {
+      code, absent: false, gp,
+      total, theory: T, practical: P,
+fail: false, practicalFail: false, theoryFail: false, issues,
+      rule: `R-11+R-10: theory ${T}/75 ✓ (≥25), practical ${P}/25 ✓ (≥8); total mark ${total} → ${gpRange(total)}${clampNote}`
+
+    };
+  }
+
+  // THEORY-ONLY SUBJECT (R-10)
+if (!isNum(mark)) {                                                               // D-2
+    return dataErrorResult(code, subjectType, isOptional,
+      [`${code}: expected a number out of 100, got ${JSON.stringify(mark)}`], JSON.stringify(mark));
+  }
+  let total = mark;
+  if (total < 0 || total > 100) {                                                   // D-3
+    const c = clampTo(total, 0, 100);
+    issues.push(`${code}: mark ${total} outside 0–100, clamped to ${c}`);
+    total = c;
+  }
+
+  const gp = markToGP(total);
+  return {
+    code, absent: false, gp,
+    total, theory: null, practical: null,
+    fail: gp === 0,
+practicalFail: false, theoryFail: false, issues,
+    rule: `R-10: mark ${total}/100 → ${gpRange(total)}${issues.length ? ` [${issues.join('; ')}]` : ''}`
+
+  };
+}
+
+/**
+ * Process a single student through all grading rules.
+ */
+function processStudent(student, subjectMap, compulsory) {
+  const optCode = student.optional;
+const marks = (student.marks && typeof student.marks === 'object') ? student.marks : {};
+  const subjectResults = {};
+  const dataIssues = [];
+
+  // Grade exactly the subjects the schema expects: the six compulsory + the
+  // declared optional. Anything else in the file is reported, never graded (D-4).
+  const expected = [...compulsory];
+  if (optCode && !expected.includes(optCode)) expected.push(optCode);
+  if (!optCode) dataIssues.push('No optional subject declared for this student');
+
+  for (const code of expected) {
+    const meta = subjectMap[code] || { code, name: code, practical: false };
+    if (!subjectMap[code]) dataIssues.push(`Subject '${code}' is not declared in the case schema`);
+    const present = Object.prototype.hasOwnProperty.call(marks, code);
+    const r = processSubject(code, marks[code], meta, code === optCode, present);
+    subjectResults[code] = r;
+    if (r.issues && r.issues.length) dataIssues.push(...r.issues);
+  }
+
+  for (const code of Object.keys(marks)) {
+    if (!expected.includes(code)) {
+      dataIssues.push(`Mark supplied for '${code}', which is neither compulsory nor this student's optional — ignored`); // D-4
+    }
+
+  }
+
+  // Compulsory sum and failure detection
+  let compSum = 0;
+  let compFail = false;
+  const compFailCodes = [];
+
+  for (const code of compulsory) {
+    const r = subjectResults[code];
+    if (!r) { compFail = true; compFailCodes.push(code); continue; }
+    compSum += r.gp;
+    if (r.fail || r.absent) { compFail = true; compFailCodes.push(code); }
+  }
+
+  // Optional contribution (R-13)
+  const optR = subjectResults[optCode];
+  const optGP = optR ? optR.gp : 0;
+  const optContrib = Math.max(0, optGP - 2.0);
+
+  // GPA calculation (R-13)
+  const rawGPA = (compSum + optContrib) / 6;
+  const cappedGPA = Math.min(5.0, rawGPA);
+  const uncancelledGPA = parseFloat(cappedGPA.toFixed(2));
+
+  let finalGPA, letterGrade;
+  if (compFail) {
+    finalGPA = 0.00;
+    letterGrade = "F";
+  } else {
+    finalGPA = uncancelledGPA;
+    letterGrade = gpToLetter(finalGPA);
+  }
+
+  // Checking list flags (R-29)
+  const onOptList  = optGP <= 2.0;
+  const onPracList = Object.values(subjectResults).some(r => r.practicalFail);
+  const onAbList   = Object.values(subjectResults).some(r => r.absent);
+const onDataList = dataIssues.length > 0;
+
+  return {
+    ...student,
+    id: String(student.id ?? '—'),
+    name: String(student.name ?? 'Unknown'),
+    class: String(student.class ?? 'Unassigned'),
+    subjectResults, dataIssues,
+
+    compSum, compFail, compFailCodes,
+    optGP, optContrib,
+    rawGPA, cappedGPA, uncancelledGPA,
+    finalGPA, letterGrade,
+onOptList, onPracList, onAbList, onDataList
+
+  };
+}
+
+function processCase(caseData) {
+  const subjectMap = {};
+  for (const s of caseData.subjects) subjectMap[s.code] = s;
+  const processed = caseData.students.map(s =>
+    processStudent(s, subjectMap, caseData.compulsory)
+  );
+  return { ...caseData, subjectMap, processed };
+}
+
+
+/* alias kept so the ported validator reads as originally written */
+const escapeHTML = esc;
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  UI KIT — icons, components, feedback states          ║
+   ║  Every repeated piece of chrome is a function here so  ║
+   ║  the render code below stays declarative.              ║
+   ╚═══════════════════════════════════════════════════════╝ */
+
+const ICON = {
+  grid:'<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>',
+  users:'<path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="7" r="3.5"/><path d="M21 20v-1.5a4 4 0 0 0-3-3.87"/><path d="M15.5 3.7a3.5 3.5 0 0 1 0 6.6"/>',
+  clipboard:'<rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 4.5v1.5H9V4.5Z"/><path d="m9.5 13.5 2 2 3.5-4"/>',
+  chart:'<path d="M3.5 20.5h17"/><rect x="5.5" y="11" width="3.5" height="6.5" rx="1"/><rect x="11" y="6.5" width="3.5" height="11" rx="1"/><rect x="16.5" y="9" width="3.5" height="8.5" rx="1"/>',
+  shield:'<path d="M12 3 4.5 5.8v5.9c0 4.3 3.2 7.9 7.5 8.6 4.3-.7 7.5-4.3 7.5-8.6V5.8L12 3Z"/><path d="m9.2 12 2 2 3.6-3.8"/>',
+  printer:'<path d="M7 9V4.5A1.5 1.5 0 0 1 8.5 3h7A1.5 1.5 0 0 1 17 4.5V9"/><rect x="3.5" y="9" width="17" height="7.5" rx="2"/><path d="M7 14.5h10V21H7v-6.5Z"/>',
+  folder:'<path d="M3 6.5A2 2 0 0 1 5 4.5h3.6l2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11Z"/>',
+  database:'<ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V6"/><path d="M4.5 12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.3-4.3"/>',
+  close:'<path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/>',
+  upload:'<path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/>',
+  alert:'<path d="M12 4 3 19.5h18L12 4Z"/><path d="M12 10.5v4"/><path d="M12 17.4v.2"/>',
+  check:'<circle cx="12" cy="12" r="8.5"/><path d="m8.4 12 2.5 2.5 4.7-5"/>',
+  xcircle:'<circle cx="12" cy="12" r="8.5"/><path d="m9.3 9.3 5.4 5.4M14.7 9.3l-5.4 5.4"/>',
+  info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2"/><path d="M12 7.9v.2"/>',
+  star:'<path d="m12 3.8 2.5 5.2 5.6.8-4.1 3.9 1 5.6-5-2.7-5 2.7 1-5.6L3.9 9.8l5.6-.8L12 3.8Z"/>',
+  zap:'<path d="M13.2 3 5.8 13.4h5.3l-.9 7.6 7.4-10.4h-5.3l.9-7.6Z"/>',
+  userx:'<circle cx="9.5" cy="7.5" r="4"/><path d="M2.5 20.5v-1a4.5 4.5 0 0 1 4.5-4.5h4"/><path d="m16 15.5 5 5M21 15.5l-5 5"/>',
+  wrench:'<path d="M15.6 4.4a4.8 4.8 0 0 0 5.9 6.6l-8.4 8.4a2.4 2.4 0 0 1-3.4 0l-2.6-2.6a2.4 2.4 0 0 1 0-3.4l8.5-9Z"/>',
+  'arrow-right':'<path d="M4.5 12h15"/><path d="m13.5 6 6 6-6 6"/>',
+  'arrow-left':'<path d="M19.5 12h-15"/><path d="m10.5 18-6-6 6-6"/>',
+  sort:'<path d="M8 4.5v15"/><path d="m4.8 8.2 3.2-3.7 3.2 3.7"/><path d="M16 19.5v-15"/><path d="m12.8 15.8 3.2 3.7 3.2-3.7"/>',
+  up:'<path d="M12 19V5"/><path d="m6 11 6-6 6 6"/>',
+  down:'<path d="M12 5v14"/><path d="m6 13 6 6 6-6"/>',
+  target:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>',
+  trend:'<path d="m3.5 16.5 5.5-5.5 3.5 3.5 8-8"/><path d="M15.5 6.5h5v5"/>',
+  award:'<circle cx="12" cy="9" r="5.5"/><path d="m8.6 13.6-1.1 7.4L12 18.6l4.5 2.4-1.1-7.4"/>',
+  file:'<path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5L13.5 3Z"/><path d="M13.5 3v5.5H19"/>',
+  filter:'<path d="M4 5.5h16l-6.2 7.3v5.4l-3.6 1.8v-7.2L4 5.5Z"/>',
+  book:'<path d="M4.5 5A2 2 0 0 1 6.5 3H19v18H6.5a2 2 0 0 1-2-2V5Z"/><path d="M4.5 17.5h14"/>',
+  slash:'<circle cx="12" cy="12" r="8.5"/><path d="m6.5 6.5 11 11"/>'
+};
+
+function icon(name, cls){
+  const d = ICON[name] || ICON.info;
+  return `<svg class="ico ${cls||''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+}
+/* fill every declarative <span class="ico-slot" data-ico="…"> in the static markup */
+function hydrateIcons(root){
+  (root||document).querySelectorAll('.ico-slot[data-ico]').forEach(el=>{
+    el.outerHTML = icon(el.dataset.ico);
+  });
+}
+
+/* ─── small formatters ─── */
+const fmt = {
+  n: v => v.toLocaleString('en-US'),
+  gpa: v => v.toFixed(2),
+  gp: v => v.toFixed(1),
+  pct: (a,b) => b ? Math.round((a/b)*100) : 0
+};
+
+/* ─── components ─── */
+function Chip(text, tone, ic){
+  /* label wrapped so compact contexts (mobile flag column) can show icon only */
+  return `<span class="chip c-${tone}">${ic?icon(ic):''}<span class="chip-l">${text}</span></span>`;
+}
+function GradeBadge(letter, extraStyle){
+  return `<span class="gb" data-grade="${esc(letter)}"${extraStyle?` style="${extraStyle}"`:''}>${esc(letter)}</span>`;
+}
+function Kpi({label, value, sub, tone, icon:ic, meter, onclick}){
+  const inner = `
+    <div class="kpi-hd">${icon(ic)}<span class="t-label">${label}</span></div>
+    <div class="kpi-val">${value}</div>
+    ${meter!=null?`<div class="meter"><i style="width:${meter}%"></i></div>`:''}
+    ${sub?`<div class="kpi-sub">${sub}</div>`:''}`;
+  return `<div class="kpi" data-tone="${tone||''}">${
+    onclick ? `<button class="kpi-action" onclick="${onclick}">${inner}</button>` : inner
+  }</div>`;
+}
+function Card(title, body, action){
+  return `<div class="card">
+    ${title?`<div class="card-hd"><h3 class="t-h2">${title}</h3>${action||''}</div>`:''}
+    <div class="card-bd">${body}</div>
+  </div>`;
+}
+function Empty(ic, title, msg, action){
+  return `<div class="empty">
+    <div class="empty-ic">${icon(ic)}</div>
+    <div><h4>${title}</h4><p style="margin-top:4px;">${msg}</p></div>
+    ${action||''}
+  </div>`;
+}
+function BarRow({key, value, max, total, color, wide}){
+  const w = max ? (value/max)*100 : 0;
+  return `<div class="bar-row">
+    <div class="bar-key ${wide?'wide':''}" ${color&&!wide?`style="color:${color}"`:''} title="${esc(key)}">${esc(key)}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${w.toFixed(1)}%;background:${color};"></div></div>
+    <div class="bar-num">${value}${total?` <em>${fmt.pct(value,total)}%</em>`:''}</div>
+  </div>`;
+}
+const GRADES = ['A+','A','A-','B','C','D','F'];
+const GRADE_COLOR = {'A+':'#22C55E','A':'#4ADE80','A-':'#38BDF8','B':'#60A5FA','C':'#A78BFA','D':'#F59E0B','F':'#EF4444'};
+
+/* ─── feedback: toast ─── */
+const TOAST_ICON = {ok:'check', bad:'xcircle', warn:'alert', info:'info'};
+function toast(title, msg, type='info', ms=4200){
+  const host = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast t-${type}-b`;
+  el.innerHTML = `${icon(TOAST_ICON[type])}
+    <div class="toast-b"><strong>${esc(title)}</strong>${msg?`<span>${esc(msg)}</span>`:''}</div>
+    <button class="toast-x" aria-label="Dismiss">${icon('close')}</button>`;
+  const kill = () => { el.classList.add('out'); setTimeout(()=>el.remove(), 200); };
+  el.querySelector('.toast-x').onclick = kill;
+  host.appendChild(el);
+  setTimeout(kill, ms);
+}
+
+/* ─── feedback: blocking busy state ─── */
+function busy(on, msg, sub){
+  const b = document.getElementById('busy');
+  if(msg) document.getElementById('busy-msg').textContent = msg;
+  if(sub) document.getElementById('busy-sub').textContent = sub;
+  b.classList.toggle('on', !!on);
+}
+/* let the browser paint the busy overlay before a heavy synchronous pass */
+const raf = typeof requestAnimationFrame === 'function'
+  ? requestAnimationFrame
+  : fn => setTimeout(fn, 16);
+function afterPaint(fn){ raf(()=>raf(fn)); }
+
+/* ─── skeletons shown while the engine runs ─── */
+function showSkeletons(){
+  document.getElementById('dash-hero').innerHTML = `<div class="skel" style="height:104px;border-radius:var(--r4);margin-bottom:var(--s5);"></div>`;
+  document.getElementById('kpis').innerHTML = Array.from({length:4},()=>`<div class="skel skel-kpi"></div>`).join('');
+  document.getElementById('dash-charts').innerHTML = `<div class="skel skel-card"></div><div class="skel skel-card"></div>`;
+  document.getElementById('dash-queue').innerHTML = '';
+}
+
+/* ─── modal helpers: escape key + focus return ─── */
+let lastFocus = null;
+function openOverlay(id){
+  lastFocus = document.activeElement;
+  const o = document.getElementById(id);
+  o.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  const f = o.querySelector('button,input,[tabindex]');
+  if(f) f.focus();
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  if(!document.querySelector('.overlay.open')) document.body.style.overflow = '';
+  if(lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function closeOverlay(id, e){ if(e.target.id === id) closeModal(id); }
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  const open = document.querySelector('.overlay.open');
+  if(open) closeModal(open.id);
+});
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  APP STATE                                            ║
+   ╚═══════════════════════════════════════════════════════╝ */
+const APP = { cases:[], idx:0, filtered:[], sortField:'id', sortDir:1 };
+function CC(){ return APP.cases[APP.idx]; }
+
+/* derived once per render so the views stay dumb */
+function stats(c){
+  const s = c.processed, total = s.length;
+  const passed = s.filter(x=>x.letterGrade!=='F').length;
+  const gpas = s.filter(x=>x.letterGrade!=='F').map(x=>x.finalGPA);
+  const flagged = s.filter(x=>x.onOptList||x.onPracList||x.onAbList||x.onDataList);
+  return {
+    total, passed, failed: total-passed,
+    passRate: fmt.pct(passed,total),
+    avgGPA: gpas.length ? (gpas.reduce((a,b)=>a+b,0)/gpas.length) : 0,
+    aplus: s.filter(x=>x.letterGrade==='A+').length,
+    flagged,
+    opt: s.filter(x=>x.onOptList), prac: s.filter(x=>x.onPracList),
+    ab: s.filter(x=>x.onAbList), data: s.filter(x=>x.onDataList),
+    highAvgFails: s.filter(x=>x.compFail && x.uncancelledGPA>=3.5)
+  };
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  FILE HANDLING                                        ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function readJSONFile(file){
+  if(!file) return;
+  if(!/\.json$/i.test(file.name) && file.type && !/json/.test(file.type)){
+    toast('Unsupported file', `${file.name} is not a .json file.`, 'bad');
+    return;
+  }
+  busy(true,'Reading file…', file.name);
+  const r = new FileReader();
+  r.onload = ev => {
+    let json;
+    try { json = JSON.parse(ev.target.result); }
+    catch(err){
+      busy(false);
+      setLoadStatus(`Could not parse <code>${esc(file.name)}</code>. ${esc(err.message)}`, 'warn');
+      toast('Invalid JSON', err.message, 'bad', 6000);
+      return;
+    }
+    initApp(json, file.name);
+  };
+  r.onerror = () => { busy(false); toast('Could not read file','The browser blocked access to that file.','bad'); };
+  r.readAsText(file);
+}
+function handleFile(e){ readJSONFile(e.target.files[0]); e.target.value=''; }
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('click', ()=>document.getElementById('file-input').click());
+dz.addEventListener('keydown', e=>{
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); document.getElementById('file-input').click(); }
+});
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.classList.remove('over');
+  readJSONFile(e.dataTransfer.files[0]);
+});
+
+function setLoadStatus(html, tone){
+  const el = document.getElementById('load-status');
+  if(!el) return;
+  el.innerHTML = html;
+  el.className = 'load-status' + (tone==='warn' ? ' warn' : '');
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  BOOT                                                 ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function initApp(json, sourceName){
+  let cases;
+  if(json && json.cases) cases = json.cases;
+  else if(json && json.students) cases = [json];
+  else if(Array.isArray(json)) cases = json;
+  else {
+    busy(false);
+    setLoadStatus('That file has no <code>cases</code> array and no <code>students</code> array, so there is nothing to grade.','warn');
+    toast('Unrecognised format','Expected {"cases":[…]} or a single case with "students".','bad',6000);
+    return;
+  }
+  if(!cases.length){
+    busy(false);
+    toast('Nothing to process','That file contains no cases.','warn');
+    return;
+  }
+
+  busy(true,'Processing results…','Applying the grading rules to every student');
+  showApp();
+  showSkeletons();
+
+  afterPaint(()=>{
+    const t0 = performance.now();
+    try {
+      APP.cases = cases.map(processCase);
+    } catch(err){
+      busy(false); resetApp();
+      toast('Could not process that file', err.message, 'bad', 7000);
+      return;
+    }
+    APP.idx = 0;
+    const ms = Math.round(performance.now()-t0);
+    const n = APP.cases.reduce((a,c)=>a+c.processed.length,0);
+
+    const cs = document.getElementById('cs-sel');
+    const wrap = document.getElementById('cs-wrap');
+    if(APP.cases.length > 1){
+      wrap.style.display = 'flex';
+      cs.innerHTML = APP.cases.map((c,i)=>
+        `<option value="${i}">${esc(c.case_id||'Case '+(i+1))} · ${c.students.length} students</option>`).join('');
+      cs.onchange = () => { APP.idx = +cs.value; renderAll(); switchTab('dashboard'); };
+    } else wrap.style.display = 'none';
+
+    renderAll();
+    switchTab('dashboard');
+    busy(false);
+    toast('Results ready',
+      `${fmt.n(n)} student${n===1?'':'s'} graded in ${ms} ms${sourceName?` from ${sourceName}`:''}.`, 'ok');
+  });
+}
+
+function showApp(){
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('nav').style.display = 'block';
+<<<<<<< HEAD
+  document.getElementById('btn-load').style.display = 'flex';
+  document.getElementById('btn-print').style.display = 'flex';
+
+  const cw = document.getElementById('cs-wrap');
+  const cs = document.getElementById('cs-sel');
+  if (APP.cases.length > 1) {
+    cw.style.display = 'flex';
+    cs.innerHTML = APP.cases.map((c,i) =>
+`<option value="${i}">${esc(c.case_id||'Case '+(i+1))} (${c.students.length} students)</option>`
+
+    ).join('');
+    cs.onchange = () => { APP.idx = +cs.value; renderAll(); };
+  } else {
+    cw.style.display = 'none';
+  }
+
+  renderAll();
+  switchTab('dashboard');
+=======
+  document.getElementById('btn-load').style.display = 'inline-flex';
+  document.getElementById('btn-print').style.display = 'inline-flex';
+>>>>>>> origin/master
+}
+function goHome(){ if(APP.cases.length) showApp(); }
+function resetApp(){
+  document.getElementById('load-screen').style.display = 'grid';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('nav').style.display = 'none';
+  document.getElementById('cs-wrap').style.display = 'none';
+  document.getElementById('btn-load').style.display = 'none';
+  document.getElementById('btn-print').style.display = 'none';
+  document.getElementById('btn-back-home').style.display = APP.cases.length ? 'inline-flex' : 'none';
+}
+
+function renderAll(){
+  renderDash(); renderStudents(); renderChecking(); renderSummary(); updateBadges();
+}
+function updateBadges(){
+  const st = stats(CC());
+  document.getElementById('bdg-s').textContent = st.total;
+  const b = document.getElementById('bdg-c');
+  b.textContent = st.flagged.length;
+  b.dataset.alert = st.flagged.length ? '1' : '0';
+}
+
+/* ─── tabs ─── */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    const on = b.dataset.tab === name;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id === 'tab-'+name));
+  window.scrollTo({top:0, behavior:'instant'});
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  OVERVIEW — what ran → why it matters → what's next   ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function renderDash(){
+  const c = CC(), s = c.processed, st = stats(c);
+
+<<<<<<< HEAD
+/* ─── DASHBOARD ─── */
+function renderDash() {
+  const c = CC();
+  const students = c.processed;
+  const total = students.length;
+  const passed = students.filter(s => s.letterGrade !== 'F').length;
+  const failed = total - passed;
+  const passRate = total ? ((passed/total)*100).toFixed(1) : '0.0';
+  const gpas = students.filter(s=>s.letterGrade!=='F').map(s=>s.finalGPA);
+  const avgGPA = gpas.length ? (gpas.reduce((a,b)=>a+b,0)/gpas.length).toFixed(2) : '0.00';
+  const aPlus = students.filter(s=>s.letterGrade==='A+').length;
+const needsChk = students.filter(s=>s.onOptList||s.onPracList||s.onAbList||s.onDataList).length;
+
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card" style="--ca:var(--cyan);">
+      <div class="s-icon">👥</div><div class="s-val">${total}</div><div class="s-lbl">Total Students</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--green);">
+      <div class="s-icon">✅</div><div class="s-val" style="color:var(--green);">${passed}</div><div class="s-lbl">Passed · ${passRate}%</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--red);">
+      <div class="s-icon">❌</div><div class="s-val" style="color:var(--red);">${failed}</div><div class="s-lbl">Failed</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--teal);">
+      <div class="s-icon">📊</div><div class="s-val" style="color:var(--teal);">${avgGPA}</div><div class="s-lbl">Avg GPA (Passed)</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--green);">
+      <div class="s-icon">🏆</div><div class="s-val" style="color:var(--green);">${aPlus}</div><div class="s-lbl">A+ Students</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--amber);">
+      <div class="s-icon">⚠️</div><div class="s-val" style="color:var(--amber);">${needsChk}</div><div class="s-lbl">Needs Verification</div>
+    </div>
+  `;
+
+  // Grade Distribution
+  const GC = {'A+':'#10b981','A':'#14b8a6','A-':'#06b6d4','B':'#3b82f6','C':'#8b5cf6','D':'#f59e0b','F':'#ef4444'};
+  const grades = ['A+','A','A-','B','C','D','F'];
+  const gcnt = Object.fromEntries(grades.map(g=>[g,0]));
+  students.forEach(s=>{const g=s.letterGrade;gcnt[g]=(gcnt[g]||0)+1;});
+  const mxG = Math.max(...Object.values(gcnt),1);
+
+  const gradeChart = grades.map(g=>{
+    const n=gcnt[g]; const pct=((n/mxG)*100).toFixed(1);
+    return `<div class="bar-row">
+      <div class="bar-lbl" style="color:${GC[g]};">${g}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${GC[g]};">${n&&pct>15?n:''}</div></div>
+      <div class="bar-cnt">${n}</div>
+=======
+  /* hero: the one sentence a judge should read */
+  const needs = st.flagged.length;
+  document.getElementById('dash-hero').innerHTML = `
+    <div class="hero">
+      <div class="hero-main">
+        <div class="hero-eyebrow">
+          ${Chip(esc(c.case_id||'Marks sheet'),'ac','file')}
+          ${Chip(`${st.total} students`,'mute','users')}
+          ${Chip('5 rules applied','mute','shield')}
+        </div>
+        <h2>${fmt.n(st.total)} results computed · <b>${fmt.n(needs)}</b> need a teacher's eye</h2>
+        <p>Every mark was graded against the SSC rules and each grade point carries the rule that produced it.
+        ${needs
+          ? `${fmt.n(needs)} result${needs===1?'':'s'} turn on an optional-subject rule, a practical fail, an absence or a data problem — check those before publishing.`
+          : `No result depends on an optional-subject rule, a practical fail, an absence or a data problem.`}</p>
+      </div>
+      <div class="hero-cta">
+        ${needs?`<button class="btn btn-pri btn-lg" onclick="switchTab('checking')">
+          ${icon('clipboard')}Review verification queue${icon('arrow-right')}</button>`:''}
+        <button class="btn btn-ghost btn-lg" onclick="switchTab('students')">
+          ${icon('users')}Browse all students</button>
+      </div>
+>>>>>>> origin/master
+    </div>`;
+
+  /* four focused KPIs, not six equal boxes */
+  document.getElementById('kpis').innerHTML = [
+    Kpi({label:'Pass rate', value:st.passRate+'%', icon:'target', tone:'ok',
+         meter:st.passRate,
+         sub:`${fmt.n(st.passed)} passed · ${fmt.n(st.failed)} failed`}),
+    Kpi({label:'Average GPA', value:fmt.gpa(st.avgGPA), icon:'trend', tone:'ac',
+         sub:`across passing students · ${fmt.n(st.aplus)} on A+`}),
+    Kpi({label:'Needs verification', value:fmt.n(needs), icon:'clipboard',
+         tone: needs?'warn':'ok',
+         sub: needs?`${icon('arrow-right')}open the queue`:'nothing outstanding',
+         onclick:"switchTab('checking')"}),
+    Kpi({label:'Failed on one subject', value:fmt.n(st.highAvgFails.length), icon:'alert',
+         tone: st.highAvgFails.length?'bad':'ok',
+         sub:'strong average, single compulsory failure'})
+  ].join('');
+
+  /* distribution + subject failures */
+  const gcnt = Object.fromEntries(GRADES.map(g=>[g,0]));
+  s.forEach(x=>{ gcnt[x.letterGrade] = (gcnt[x.letterGrade]||0)+1; });
+  const gmax = Math.max(...Object.values(gcnt),1);
+  const gradeBars = GRADES.map(g=>BarRow({key:g, value:gcnt[g], max:gmax, total:st.total, color:GRADE_COLOR[g]})).join('');
+
+  const sf = {};
+  c.subjects.forEach(x=>{ sf[x.code] = {name:x.name, n:0}; });
+  s.forEach(x=>Object.entries(x.subjectResults).forEach(([code,r])=>{
+    if((r.fail||r.absent) && sf[code]) sf[code].n++;
+  }));
+  const sfArr = Object.values(sf).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+  const fmax = sfArr[0]?.n||1;
+
+<<<<<<< HEAD
+  const failChart = sfArr.length ? sfArr.map(({name,n})=>{
+    const bw=((n/mxF)*100).toFixed(1);
+    const pct=((n/total)*100).toFixed(0);
+    return `<div class="sf-row">
+<div class="sf-name">${esc(name)}</div>
+
+      <div class="sf-track"><div class="sf-fill" style="width:${bw}%;">${bw>20?`${n} (${pct}%)`:''}</div></div>
+      <div class="sf-cnt">${n}</div>
+    </div>`;
+  }).join('') : '<div class="empty"><div class="ei">🎉</div><p>No subject failures recorded!</p></div>';
+=======
+  document.getElementById('dash-charts').innerHTML =
+    Card('Grade distribution', `<div class="bars">${gradeBars}</div>`) +
+    Card('Failures by subject', sfArr.length
+      ? `<div class="bars">${sfArr.map(x=>BarRow({key:x.name, value:x.n, max:fmax, total:st.total, color:'#EF4444', wide:true})).join('')}</div>`
+      : Empty('check','No subject failures','Every student passed every subject in this case.'));
+>>>>>>> origin/master
+
+  /* verification queue preview → routes into the checking tab */
+  const q = st.flagged.slice(0,6);
+  document.getElementById('dash-queue').innerHTML = q.length ? `
+    <div class="card">
+      <div class="card-hd">
+        <h3 class="t-h2">Verification queue</h3>
+        ${Chip(`${st.flagged.length} total`,'warn')}
+        <button class="btn btn-quiet" onclick="switchTab('checking')">View all${icon('arrow-right')}</button>
+      </div>
+      <div>${q.map(x=>ckItem(x, reasonSummary(x))).join('')}</div>
+    </div>` : '';
+}
+
+/* one-line "why is this student here" used by the queue preview */
+function reasonSummary(s){
+  const bits = [];
+  if(s.onDataList) bits.push('input problem');
+  if(s.onAbList)   bits.push('absent mark');
+  if(s.onPracList) bits.push('practical fail');
+  if(s.onOptList)  bits.push(`optional GP ${fmt.gp(s.optGP)}`);
+  return bits.join(' · ');
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  STUDENTS TABLE                                       ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function renderStudents(){
+  const c = CC();
+  const classes = [...new Set(c.processed.map(s=>s.class))].sort();
+  const cf = document.getElementById('q-class');
+<<<<<<< HEAD
+  cf.innerHTML = '<option value="">All Classes</option>' +
+classes.map(cl=>`<option value="${esc(cl)}">${esc(cl)}</option>`).join('');
+=======
+  const keep = cf.value;
+  cf.innerHTML = '<option value="">All classes</option>' +
+    classes.map(cl=>`<option value="${esc(cl)}">${esc(cl)}</option>`).join('');
+  if([...cf.options].some(o=>o.value===keep)) cf.value = keep;
+
+  document.getElementById('sthead').innerHTML = [
+    th('id','ID',true,'col-id'), th('name','Student',true), th('class','Class',true,'col-class'),
+    `<th class="col-opt">Optional</th>`,
+    ...c.compulsory.map(code=>`<th class="num col-sub" title="${esc(c.subjectMap[code]?.name||code)}">${esc(code)}</th>`),
+    `<th class="num col-sub">Opt GP</th>`, th('finalGPA','GPA',true,'num'),
+    `<th>Grade</th>`, `<th>Flags</th>`
+  ].join('');
+>>>>>>> origin/master
+
+  APP.filtered = [...c.processed];
+  APP.sortField = 'id'; APP.sortDir = 1;
+  renderTable();
+}
+function th(field,label,sortable,cls){
+  const active = APP.sortField===field;
+  return `<th class="${sortable?'sortable ':''}${cls||''}"
+    ${active?`aria-sort="${APP.sortDir===1?'ascending':'descending'}"`:''}
+    ${sortable?`onclick="sortBy('${field}')"`:''}>
+    <span class="th-in">${esc(label)}${sortable?icon(active?(APP.sortDir===1?'up':'down'):'sort'):''}</span></th>`;
+}
+
+function activeFilters(){
+  const get = id => document.getElementById(id);
+  const out = [];
+  if(get('q-search').value.trim()) out.push(['q-search',`“${get('q-search').value.trim()}”`]);
+  if(get('q-class').value)  out.push(['q-class', get('q-class').value]);
+  if(get('q-result').value) out.push(['q-result', get('q-result').value==='PASS'?'Passed':'Failed']);
+  if(get('q-grade').value)  out.push(['q-grade', 'Grade '+get('q-grade').value]);
+  if(get('q-flag').value){
+    const map = {opt:'Optional ≤ 2.0', prac:'Practical fail', absent:'Absent mark', data:'Data problem'};
+    out.push(['q-flag', map[get('q-flag').value]]);
+  }
+  return out;
+}
+function clearFilter(id){
+  document.getElementById(id).value = '';
+  filterStudents();
+}
+function clearAllFilters(){
+  ['q-search','q-class','q-result','q-grade','q-flag'].forEach(id=>document.getElementById(id).value='');
+  filterStudents();
+}
+
+function filterStudents(){
+  const c = CC();
+  const q  = document.getElementById('q-search').value.toLowerCase().trim();
+  const cl = document.getElementById('q-class').value;
+  const rs = document.getElementById('q-result').value;
+  const gr = document.getElementById('q-grade').value;
+  const fl = document.getElementById('q-flag').value;
+
+  APP.filtered = c.processed.filter(s=>{
+    if(q && !s.name.toLowerCase().includes(q) && !s.id.toLowerCase().includes(q)) return false;
+    if(cl && s.class !== cl) return false;
+    if(rs==='PASS' && s.letterGrade==='F') return false;
+    if(rs==='FAIL' && s.letterGrade!=='F') return false;
+    if(gr && s.letterGrade !== gr) return false;
+    if(fl==='absent' && !s.onAbList) return false;
+<<<<<<< HEAD
+    if(fl==='prac' && !s.onPracList) return false;
+    if(fl==='opt' && !s.onOptList) return false;
+if(fl==='data' && !s.onDataList) return false;
+
+=======
+    if(fl==='prac'   && !s.onPracList) return false;
+    if(fl==='opt'    && !s.onOptList) return false;
+    if(fl==='data'   && !s.onDataList) return false;
+>>>>>>> origin/master
+    return true;
+  });
+  applySort();
+  renderTable();
+}
+
+function sortBy(field){
+  if(APP.sortField===field) APP.sortDir *= -1;
+  else { APP.sortField = field; APP.sortDir = 1; }
+  applySort();
+  renderTable();
+  document.getElementById('sthead').innerHTML = document.getElementById('sthead').innerHTML; // refresh indicators
+  renderHead();
+}
+function renderHead(){
+  const c = CC();
+  document.getElementById('sthead').innerHTML = [
+    th('id','ID',true,'col-id'), th('name','Student',true), th('class','Class',true,'col-class'),
+    `<th class="col-opt">Optional</th>`,
+    ...c.compulsory.map(code=>`<th class="num col-sub" title="${esc(c.subjectMap[code]?.name||code)}">${esc(code)}</th>`),
+    `<th class="num col-sub">Opt GP</th>`, th('finalGPA','GPA',true,'num'),
+    `<th>Grade</th>`, `<th>Flags</th>`
+  ].join('');
+}
+function applySort(){
+  const f = APP.sortField;
+  APP.filtered.sort((a,b)=>{
+    let av=a[f], bv=b[f];
+    if(typeof av==='string'){ av=av.toLowerCase(); bv=String(bv).toLowerCase(); }
+    return av<bv ? -APP.sortDir : av>bv ? APP.sortDir : 0;
+  });
+}
+
+function gpCell(s, code){
+  const r = s.subjectResults[code];
+  if(!r) return `<td class="num gp-cell">—</td>`;
+  if(r.absent) return `<td class="num col-sub">${Chip('AB','warn')}</td>`;
+  if(r.dataError) return `<td class="num col-sub">${Chip('?','bad')}</td>`;
+  return `<td class="num gp-cell col-sub${r.gp===0?' zero':''}">${fmt.gp(r.gp)}</td>`;
+}
+
+<<<<<<< HEAD
+function renderTable() {
+  const tbody=document.getElementById('stbody');
+  if(!APP.filtered.length){
+    tbody.innerHTML=`<tr><td colspan="14"><div class="empty"><div class="ei">🔍</div><p>No students match selected filters</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML=APP.filtered.map(s=>{
+    const gCls = s.letterGrade==='A+'?'gA\\+':s.letterGrade==='A-'?'gA-':'g'+s.letterGrade;
+    const flags=[];
+    if(s.onAbList) flags.push('<span class="tag t-warn">AB</span>');
+    if(s.onPracList) flags.push('<span class="tag t-warn">P-FAIL</span>');
+    if(s.onOptList) flags.push('<span class="tag t-info">OPT≤2</span>');
+if(s.onDataList) flags.push('<span class="tag t-fail">DATA</span>');
+
+=======
+function renderTable(){
+  const c = CC(), rows = APP.filtered;
+>>>>>>> origin/master
+
+  const af = activeFilters();
+  document.getElementById('active-filters').innerHTML = af.length ? `
+    <div class="active-filters">
+      <span class="t-label">Filters</span>
+      ${af.map(([id,label])=>`<span class="fchip">${esc(label)}
+        <button onclick="clearFilter('${id}')" aria-label="Remove filter">${icon('close')}</button></span>`).join('')}
+      <button class="btn btn-quiet" style="height:24px;font-size:11px;" onclick="clearAllFilters()">Clear all</button>
+    </div>` : '';
+
+<<<<<<< HEAD
+return `<tr data-sid="${esc(s.id)}" onclick="openModal(this.dataset.sid)">
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);">${esc(s.id)}</span></td>
+      <td><span style="font-weight:500;">${esc(s.name)}</span></td>
+      <td><span style="font-size:11px;color:var(--text-2);">${esc(s.class)}</span></td>
+      <td><span style="font-size:11px;color:var(--text-3);">${esc(s.optional)}</span></td>
+
+      ${gpCell(s,'BAN')}${gpCell(s,'ENG')}${gpCell(s,'MAT')}
+      ${gpCell(s,'PHY')}${gpCell(s,'CHE')}${gpCell(s,'BIO')}
+      <td>${optCell}</td>
+      <td>
+        <span class="gpa-n" style="${s.letterGrade==='F'?'color:var(--red);':''}">${s.finalGPA.toFixed(2)}</span>
+        ${s.compFail?`<br><span style="font-size:9px;color:var(--text-3);">raw:${s.uncancelledGPA.toFixed(2)}</span>`:''}
+      </td>
+      <td><span class="gb ${gCls}">${s.letterGrade}</span></td>
+      <td>${flags.join(' ')||'<span style="color:var(--text-3);font-size:11px;">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ─── STUDENT DETAIL MODAL & TRACE ─── */
+let currentStudent = null;
+
+function openModal(id) {
+  const c=CC();
+  const s=c.processed.find(st=>st.id===id);
+  if(!s) return;
+  currentStudent=s;
+
+  document.getElementById('m-name').textContent=s.name;
+  document.getElementById('m-meta').textContent=
+    `${s.id} · ${s.class} · Optional: ${c.subjectMap[s.optional]?.name||s.optional}`;
+
+  const av=document.getElementById('m-av');
+  av.style.background = s.compFail
+    ? 'linear-gradient(135deg,#7f1d1d,#dc2626)'
+    : s.letterGrade==='A+'
+      ? 'linear-gradient(135deg,#064e3b,#10b981)'
+      : 'linear-gradient(135deg,#1e3a5f,#3b82f6)';
+
+  // Flags
+  const flags=[];
+  if(s.compFail){
+    const names=s.compFailCodes.map(code=>c.subjectMap[code]?.name||code).join(', ');
+    flags.push(`<span class="fp fp-fail">❌ Compulsory subject failed: ${names}</span>`);
+  }
+  if(s.onPracList) flags.push(`<span class="fp fp-warn">⚡ Practical component failed (R-11)</span>`);
+  if(s.onAbList)   flags.push(`<span class="fp fp-warn">📋 Absent in subject (R-12)</span>`);
+  if(s.onOptList)  flags.push(`<span class="fp fp-info">ℹ️ Optional GP ${s.optGP.toFixed(1)} ≤ 2.0 — bonus +${s.optContrib.toFixed(1)} (R-13)</span>`);
+if(s.onDataList) flags.push(`<span class="fp fp-fail">🛠️ Input problem: ${s.dataIssues.map(i=>esc(i)).join(' · ')}</span>`);
+
+  if(!s.compFail&&s.rawGPA>5.00) flags.push(`<span class="fp fp-info">✨ GPA capped at 5.00 (R-13)</span>`);
+  if(!flags.length) flags.push(`<span class="fp fp-ok">✅ Clean result — all requirements met</span>`);
+
+  // Trace rows
+  const allCodes=[...c.compulsory, s.optional];
+  const traceRows=allCodes.map(code=>{
+    const meta=c.subjectMap[code];
+    const r=s.subjectResults[code];
+    const isOpt=code===s.optional;
+    if(!r) return '';
+
+    let markCell,gpCell;
+    if(r.absent){
+      markCell=`<span class="tag t-warn" style="font-size:11px;">AB</span>`;
+      gpCell=`<span class="tag t-fail">0.0</span>`;
+    } else if(meta?.practical){
+      markCell=`
+        <span class="t-mark">Theory: ${r.theory}/75 &nbsp; Practical: ${r.practical}/25</span>
+        <br><span style="font-size:10px;color:var(--text-3);">Total mark: ${r.total}/100</span>`;
+      gpCell=r.fail
+        ? `<span class="tag t-fail">0.0</span><br><span style="font-size:9px;color:var(--text-3);">would give ${r.gpIfPassed?.toFixed(1)} if passed</span>`
+        : `<span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--teal);">${r.gp.toFixed(1)}</span>`;
+    } else {
+      markCell=`<span class="t-mark">${r.total}/100</span>`;
+      gpCell=r.fail
+        ? `<span class="tag t-fail">0.0</span>`
+        : `<span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--teal);">${r.gp.toFixed(1)}</span>`;
+    }
+
+    const rowCls=r.absent?'tr-ab':r.fail?'tr-fail':isOpt?'tr-opt':'';
+    return `<tr class="${rowCls}">
+      <td>
+<span class="t-code">${esc(code)}</span>
+        <br><span style="font-size:10px;color:var(--text-3);">${esc(meta?.name||code)}</span>
+
+      </td>
+      <td>${isOpt?'<span style="color:var(--cyan);font-size:11px;font-weight:600;">⭐ Optional</span>':'<span style="font-size:11px;color:var(--text-3);">✔ Compulsory</span>'}</td>
+      <td>${markCell}</td>
+      <td>${gpCell}</td>
+<td><span class="t-rule">${esc(r.rule)}</span></td>
+
+    </tr>`;
+  }).join('');
+
+  // Calculation trace
+  const compLines=c.compulsory.map(code=>{
+    const r=s.subjectResults[code];
+    const name=c.subjectMap[code]?.name||code;
+    const gp=r?r.gp.toFixed(1):'0.0';
+    const note=r?.absent?' ← <span style="color:var(--amber);">ABSENT</span>':r?.fail?' ← <span style="color:var(--red);">FAIL</span>':'';
+// pad first, escape second — escaping changes length, so the order matters
+    return `<div class="cl">${esc(name.padEnd(18,' '))} : ${gp.padStart(4,' ')}${note}</div>`;
+
+  }).join('');
+
+  const optName=c.subjectMap[s.optional]?.name||s.optional;
+  const gCls=s.letterGrade==='A+'?'gA\\+':s.letterGrade==='A-'?'gA-':'g'+s.letterGrade;
+
+  document.getElementById('m-body').innerHTML=`
+    <div class="res-hl">
+      <div>
+        <div class="res-gpa" style="${s.letterGrade==='F'?'color:var(--red);':''}">${s.finalGPA.toFixed(2)}</div>
+        ${s.compFail?`<div style="font-size:10px;color:var(--text-3);margin-top:2px;">Uncancelled avg: ${s.uncancelledGPA.toFixed(2)}</div>`:''}
+      </div>
+      <div class="res-det">
+        <div class="lbl">Letter Grade</div>
+        <div class="val"><span class="gb ${gCls}" style="min-width:auto;padding:4px 12px;font-size:14px;">${s.letterGrade}</span></div>
+      </div>
+      <div class="res-det">
+        <div class="lbl">Compulsory Sum</div>
+        <div class="val" style="font-family:'JetBrains Mono',monospace;">${s.compSum.toFixed(1)}</div>
+      </div>
+      <div class="res-det">
+        <div class="lbl">Optional Bonus</div>
+        <div class="val" style="font-family:'JetBrains Mono',monospace;">+${s.optContrib.toFixed(1)}</div>
+      </div>
+      <div class="res-flags">${flags.join('')}</div>
+    </div>
+
+    <h3 style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.6px;">Subject Audit Trace (R-10 · R-11 · R-12)</h3>
+    <table class="tr-tbl">
+      <thead>
+        <tr>
+          <th>Subject</th><th>Type</th><th>Mark Used</th><th>Grade Point</th><th>Rule Applied</th>
+        </tr>
+      </thead>
+      <tbody>${traceRows}</tbody>
+    </table>
+
+    <div class="calc-box">
+      <div class="c-lbl">GPA Calculation Trace (R-13)</div>
+      <div class="${s.compFail?'unc':''}">
+        ${compLines}
+        <div class="cl" style="color:var(--cyan);">
+Optional bonus (${esc(optName)}) : +${s.optContrib.toFixed(1)} &nbsp;
+
+          [max(0, ${s.optGP.toFixed(1)} − 2.0) = ${s.optContrib.toFixed(1)}]
+        </div>
+        <div class="cl tot">Compulsory Sum + Bonus = ${s.compSum.toFixed(1)} + ${s.optContrib.toFixed(1)} = ${(s.compSum+s.optContrib).toFixed(1)}</div>
+        <div class="cl tot">Raw Average = ${(s.compSum+s.optContrib).toFixed(1)} / 6 = ${s.rawGPA.toFixed(6)}</div>
+        <div class="cl tot">Capped Average = min(5.00, ${s.rawGPA.toFixed(4)}) = ${s.cappedGPA.toFixed(2)}</div>
+      </div>
+${s.compFail?`<div class="cl err">❌ R-13 Override: Compulsory subject failure in [${esc(s.compFailCodes.join(', '))}] → Final GPA forced to 0.00, Letter Grade = F. Uncancelled average of ${s.uncancelledGPA.toFixed(2)} is shown in audit trace for office review.</div>`:''}
+
+    </div>
+  `;
+
+  document.getElementById('s-modal').classList.add('open');
+}
+
+function closeOverlay(id,e){
+  if(e.target.id===id) document.getElementById(id).classList.remove('open');
+}
+
+/* ─── CHECKING LISTS ─── */
+function renderChecking() {
+  const c=CC();
+  const students=c.processed;
+
+  const optList=students.filter(s=>s.onOptList);
+  const pracList=students.filter(s=>s.onPracList);
+  const abList=students.filter(s=>s.onAbList);
+const dataList=students.filter(s=>s.onDataList);
+
+
+  function buildList(items, reasonFn) {
+    if(!items.length) return '<div class="empty"><div class="ei">✅</div><p>No students on this list</p></div>';
+    return items.map(s=>{
+      const gCls=s.letterGrade==='A+'?'gA\\+':s.letterGrade==='A-'?'gA-':'g'+s.letterGrade;
+return `<div class="ck-item" data-sid="${esc(s.id)}" onclick="openModal(this.dataset.sid)">
+        <div class="ck-id">${esc(s.id)}</div>
+        <div class="ck-info">
+          <div class="ck-name">${esc(s.name)} <span style="font-size:11px;color:var(--text-3);">${esc(s.class)}</span></div>
+
+          <div class="ck-why">${reasonFn(s)}</div>
+        </div>
+        <span class="gb ${gCls}" style="font-size:10px;min-width:28px;height:28px;">${s.letterGrade}</span>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('ck-grid').innerHTML = `
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">⭐</span><h3>Optional Subject List</h3><div class="ck-cnt">${optList.length}</div></div>
+      <div class="ck-body">${buildList(optList,s=>{
+        const r=s.subjectResults[s.optional];
+        const name=CC().subjectMap[s.optional]?.name||s.optional;
+return r?.absent?`${esc(name)}: Absent (AB) — contributes +0.00`:`${esc(name)}: GP ${s.optGP.toFixed(1)} ≤ 2.0 — bonus +0.00 (no benefit)`;
+
+      })}</div>
+    </div>
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">⚡</span><h3>Practical Fail List</h3><div class="ck-cnt">${pracList.length}</div></div>
+      <div class="ck-body">${buildList(pracList,s=>{
+        const fp=Object.entries(s.subjectResults)
+          .filter(([,r])=>r.practicalFail)
+.map(([code,r])=>`${esc(CC().subjectMap[code]?.name||code)} (P: ${r.practical}/25 < 8)`);
+
+        return `Practical fail in: ${fp.join('; ')}`;
+      })}</div>
+    </div>
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">📋</span><h3>Absent Students List</h3><div class="ck-cnt">${abList.length}</div></div>
+      <div class="ck-body">${buildList(abList,s=>{
+        const ab=Object.entries(s.subjectResults)
+          .filter(([,r])=>r.absent)
+.map(([code])=>esc(CC().subjectMap[code]?.name||code));
+        return `Absent mark (AB) in: ${ab.join(', ')}`;
+      })}</div>
+    </div>
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">🛠️</span><h3>Data Integrity List</h3><div class="ck-cnt">${dataList.length}</div></div>
+      <div class="ck-body">${buildList(dataList,s=>
+        s.dataIssues.map(i=>esc(i)).join('<br>')
+      )}</div>
+    </div>
+
+  `;
+=======
+  const tb = document.getElementById('stbody');
+  if(!rows.length){
+    const span = 6 + c.compulsory.length + 4;
+    tb.innerHTML = `<tr><td colspan="${span}" style="border:none;">${
+      Empty('search','No students match','Try a different search term or clear the filters.',
+        `<button class="btn btn-ghost" onclick="clearAllFilters()">Clear filters</button>`)
+    }</td></tr>`;
+  } else {
+    tb.innerHTML = rows.map(s=>{
+      const optR = s.subjectResults[s.optional];
+      let optCell = '<span class="gp-cell">—</span>';
+      if(optR){
+        optCell = optR.absent ? Chip('AB','warn')
+          : optR.dataError ? Chip('?','bad')
+          : `<span class="gp-cell${optR.gp===0?' zero':''}">${fmt.gp(optR.gp)}</span>`;
+      }
+      const flags = [
+        s.onDataList ? Chip('DATA','bad','wrench') : '',
+        s.onAbList   ? Chip('AB','warn','userx') : '',
+        s.onPracList ? Chip('PRAC','warn','zap') : '',
+        s.onOptList  ? Chip('OPT','info','star') : ''
+      ].filter(Boolean).join('');
+
+      return `<tr tabindex="0" data-sid="${esc(s.id)}">
+        <td class="cell-id col-id">${esc(s.id)}</td>
+        <td class="cell-name">${esc(s.name)}</td>
+        <td class="t-dim t-xs col-class">${esc(s.class)}</td>
+        <td class="t-dimmer t-xs mono col-opt">${esc(s.optional||'—')}</td>
+        ${c.compulsory.map(code=>gpCell(s,code)).join('')}
+        <td class="num col-sub">${optCell}</td>
+        <td class="num">
+          <span class="gpa-val${s.letterGrade==='F'?' f':''}">${fmt.gpa(s.finalGPA)}</span>
+          ${s.compFail?`<span class="gpa-raw">raw ${fmt.gpa(s.uncancelledGPA)}</span>`:''}
+        </td>
+        <td>${GradeBadge(s.letterGrade)}</td>
+        <td><div class="flag-set">${flags||'<span class="t-dimmer t-xs">—</span>'}</div></td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('tbl-ft').innerHTML = `
+    <span>Showing <b class="mono" style="color:var(--tx-0)">${fmt.n(rows.length)}</b> of ${fmt.n(c.processed.length)} students</span>
+    <span>Select a row to open its full rule trace</span>`;
+>>>>>>> origin/master
+}
+
+/* one delegated handler for click + keyboard, instead of inline onclick per row */
+document.getElementById('stbody').addEventListener('click', e=>{
+  const tr = e.target.closest('tr[data-sid]');
+  if(tr) openModal(tr.dataset.sid);
+});
+document.getElementById('stbody').addEventListener('keydown', e=>{
+  if(e.key!=='Enter' && e.key!==' ') return;
+  const tr = e.target.closest('tr[data-sid]');
+  if(tr){ e.preventDefault(); openModal(tr.dataset.sid); }
+});
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  VERIFICATION LISTS                                   ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function ckItem(s, why){
+  return `<button class="ck-item" data-sid="${esc(s.id)}" onclick="openModal(this.dataset.sid)">
+    <span class="ck-item-id">${esc(s.id)}</span>
+    <span class="ck-item-b">
+      <span class="ck-item-n">${esc(s.name)} <span>${esc(s.class)}</span></span>
+      <span class="ck-item-w">${why}</span>
+    </span>
+    ${GradeBadge(s.letterGrade,'min-width:26px;height:22px;font-size:10px;')}
+  </button>`;
+}
+function ckCard({tone, ic, title, desc, items, why, emptyMsg}){
+  return `<div class="ck-card ${tone}">
+    <div class="ck-hd">
+      <span class="ck-ic">${icon(ic)}</span>
+      <span class="ck-hd-t"><h3>${title}</h3><p>${desc}</p></span>
+      <span class="ck-cnt">${items.length}</span>
+    </div>
+    <div class="ck-body">${
+      items.length ? items.map(s=>ckItem(s, why(s))).join('')
+                   : Empty('check','Nothing to check', emptyMsg)
+    }</div>
+  </div>`;
+}
+
+function renderChecking(){
+  const c = CC(), st = stats(c);
+  const subName = code => esc(c.subjectMap[code]?.name || code);
+
+  document.getElementById('ck-grid').innerHTML = [
+    ckCard({
+      tone:'tone-opt', ic:'star', title:'Optional subject', desc:'Grade point 2.0 or below — adds nothing',
+      items:st.opt, emptyMsg:'Every optional subject scored above 2.0.',
+      why:s=>{
+        const r = s.subjectResults[s.optional];
+        const n = subName(s.optional);
+        return r?.absent ? `${n} — absent, contributes +0.00`
+          : `${n} — GP ${fmt.gp(s.optGP)}, contributes +0.00 (needs above 2.0 to help)`;
+      }}),
+    ckCard({
+      tone:'tone-prac', ic:'zap', title:'Practical fail', desc:'A practical part below 8 in any subject',
+      items:st.prac, emptyMsg:'No practical mark fell below the pass mark of 8.',
+      why:s=>Object.entries(s.subjectResults).filter(([,r])=>r.practicalFail)
+        .map(([code,r])=>`${subName(code)} — practical ${r.practical}/25, theory ${r.theory}/75 passed`).join('; ')}),
+    ckCard({
+      tone:'tone-ab', ic:'userx', title:'Absent marks', desc:'AB recorded in any subject',
+      items:st.ab, emptyMsg:'No absences recorded in this case.',
+      why:s=>{
+        const codes = Object.entries(s.subjectResults).filter(([,r])=>r.absent).map(([code])=>code);
+        const comp = codes.filter(x=>c.compulsory.includes(x));
+        return `Absent in ${codes.map(subName).join(', ')}` +
+          (comp.length ? ' — compulsory, so the overall result is F' : ' — optional only, result stands');
+      }}),
+    ckCard({
+      tone:'tone-data', ic:'wrench', title:'Data problems', desc:'Marks the office must correct at source',
+      items:st.data, emptyMsg:'Every mark in this file is well-formed.',
+      why:s=>s.dataIssues.map(i=>esc(i)).join('<br>')})
+  ].join('');
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  CLASS SUMMARY                                        ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function donut(counts, total){
+  const R = 42, C = 2*Math.PI*R;
+  let off = 0;
+  const segs = GRADES.filter(g=>counts[g]).map(g=>{
+    const frac = counts[g]/total, len = frac*C;
+    const el = `<circle cx="54" cy="54" r="${R}" fill="none" stroke="${GRADE_COLOR[g]}"
+      stroke-width="13" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}"/>`;
+    off += len; return el;
+  }).join('');
+  return `<svg viewBox="0 0 108 108" role="img" aria-label="Grade distribution">
+    <circle cx="54" cy="54" r="${R}" fill="none" stroke="var(--bg-3)" stroke-width="13"/>${segs}</svg>`;
+}
+
+function renderSummary(){
+  const c = CC(), all = c.processed;
+  const classes = [...new Set(all.map(s=>s.class))].sort();
+  let html = '';
+
+  for(const cls of ['All', ...classes]){
+    const grp = cls==='All' ? all : all.filter(s=>s.class===cls);
+    if(!grp.length) continue;
+    const passed = grp.filter(s=>s.letterGrade!=='F').length;
+    const rate = fmt.pct(passed, grp.length);
+    const cnt = Object.fromEntries(GRADES.map(g=>[g,0]));
+    grp.forEach(s=>{ cnt[s.letterGrade] = (cnt[s.letterGrade]||0)+1; });
+    const gpas = grp.filter(s=>s.letterGrade!=='F').map(s=>s.finalGPA);
+    const avg = gpas.length ? gpas.reduce((a,b)=>a+b,0)/gpas.length : 0;
+
+<<<<<<< HEAD
+    html+=`<div class="chart-card">
+<h3>${cls==='All'?'🏫 Overall Performance':'📚 '+esc(cls)}
+
+        <span style="font-size:11px;font-weight:400;color:var(--text-3);margin-left:8px;">${total} students · ${passRate}% pass rate</span>
+      </h3>
+      <div class="donut-wrap" style="margin-bottom:20px;">
+        <svg class="donut-svg" viewBox="0 0 42 42">
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="#1a2236" stroke-width="4.5"/>
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="#10b981" stroke-width="4.5"
+            stroke-dasharray="${pct} 100"
+            stroke-dashoffset="25" transform="rotate(-90 21 21)" stroke-linecap="round"/>
+          <text x="21" y="21" text-anchor="middle" dominant-baseline="central"
+            fill="#edf2f7" font-size="6.5" font-weight="bold" font-family="JetBrains Mono">${pct}%</text>
+        </svg>
+        <div>
+          <div class="dl"><div class="dd" style="background:#10b981;"></div>Pass: <b>${passed}</b></div>
+          <div class="dl"><div class="dd" style="background:#ef4444;"></div>Fail: <b>${total-passed}</b></div>
+          <div class="dl"><div class="dd" style="background:#1a2236;border:1px solid rgba(255,255,255,.1);"></div>Total: <b>${total}</b></div>
+        </div>
+=======
+    html += `<div class="card">
+      <div class="card-hd">
+        <span class="ck-ic" style="--tone:var(--ac-2);--tone-soft:var(--ac-soft);">${icon(cls==='All'?'chart':'book')}</span>
+        <h3 class="t-h2">${cls==='All'?'All classes':esc(cls)}</h3>
+        ${Chip(`${grp.length} students`,'mute')}
+        ${Chip(`${rate}% pass`, rate>=75?'ok':rate>=50?'warn':'bad')}
+>>>>>>> origin/master
+      </div>
+      <div class="card-bd">
+        <div class="donut">
+          ${donut(cnt, grp.length)}
+          <div class="donut-legend">
+            ${GRADES.filter(g=>cnt[g]).map(g=>`<div class="dl">
+              <i style="background:${GRADE_COLOR[g]}"></i>${g}
+              <b>${cnt[g]} <span class="t-dimmer">· ${fmt.pct(cnt[g],grp.length)}%</span></b></div>`).join('')}
+          </div>
+        </div>
+        <div class="grid-2" style="gap:var(--s3);margin-top:var(--s5);">
+          <div class="kpi" style="padding:var(--s3) var(--s4);">
+            <div class="kpi-hd">${icon('trend')}<span class="t-label">Average GPA</span></div>
+            <div class="kpi-val" style="font-size:20px;">${fmt.gpa(avg)}</div>
+          </div>
+          <div class="kpi" style="padding:var(--s3) var(--s4);">
+            <div class="kpi-hd">${icon('award')}<span class="t-label">A+ students</span></div>
+            <div class="kpi-val" style="font-size:20px;">${cnt['A+']}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+<<<<<<< HEAD
+
+  // Subject Failure Analysis
+  const sf={};
+  c.subjects.forEach(s=>{sf[s.code]={name:s.name,n:0};});
+  students.forEach(s=>{
+    Object.entries(s.subjectResults).forEach(([code,r])=>{
+      if((r.fail||r.absent)&&sf[code]) sf[code].n++;
+    });
+  });
+  const sfArr=Object.values(sf).sort((a,b)=>b.n-a.n);
+  const mxF=sfArr[0]?.n||1;
+
+  html+=`<div class="chart-card" style="grid-column:1/-1;">
+    <h3>📉 Subject Failure Breakdown</h3>
+    ${sfArr.map(({name,n})=>{
+      const bw=((n/mxF)*100).toFixed(1);
+      const pct=((n/students.length)*100).toFixed(1);
+      return`<div class="sf-row">
+<div class="sf-name">${esc(name)}</div>
+
+        <div class="sf-track"><div class="sf-fill" style="width:${bw}%;">${bw>18?`${n} (${pct}%)`:''}</div></div>
+        <div class="sf-cnt">${n}</div>
+      </div>`;}).join('')}
+  </div>`;
+
+  document.getElementById('sum-grid').innerHTML=html;
+}
+
+/* ─── BADGES ─── */
+function updateBadges() {
+  const c=CC();
+  document.getElementById('bdg-s').textContent=c.processed.length;
+  document.getElementById('bdg-c').textContent=
+c.processed.filter(s=>s.onOptList||s.onPracList||s.onAbList||s.onDataList).length;
+
+}
+
+/* ─── TAB NAVIGATION ─── */
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+}
+
+/* ─── VALIDATION / IMPORT ─── */
+/* ================================================   SECURITY & SANITIZATION
+======================================================= */
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  if (typeof str !== 'string') str = String(str);
+  return str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[tag] || tag));
+}
+
+/* ================================================   VALIDATION & MALICIOUS CASE HANDLING
+======================================================= */
+=======
+  document.getElementById('sum-grid').innerHTML = html;
+}
+
+>>>>>>> origin/master
+function loadAdversarialSample() {
+  const sample = {
+    "case_id": "MALICIOUS-TEST-01",
+    "subjects": [
+      {"code": "BAN", "name": "Bangla", "practical": false},
+      {"code": "ENG", "name": "English", "practical": false},
+      {"code": "MAT", "name": "Mathematics", "practical": false},
+      {"code": "PHY", "name": "Physics", "practical": true},
+      {"code": "CHE", "name": "Chemistry", "practical": true},
+      {"code": "BIO", "name": "Biology", "practical": true},
+      {"code": "HMT", "name": "Higher Mathematics", "practical": true}
+    ],
+    "compulsory": ["BAN", "ENG", "MAT", "PHY", "CHE", "BIO"],
+    "students": [
+      {
+        "id": "M001",
+        "name": "<script>alert('XSS_ATTACK')<\\/script>",
+        "class": "<img src=x onerror=alert(1)>",
+        "optional": "HMT",
+        "marks": {"BAN": 80, "ENG": 75, "MAT": 90, "PHY": {"theory": 50, "practical": 20}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}}
+      },
+      {
+        "id": "M002",
+        "name": "Excessive Marks Student",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": 150, "ENG": 75, "MAT": 90, "PHY": {"theory": 95, "practical": 40}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}}
+      },
+      {
+        "id": "M003",
+        "name": "Negative & Invalid Type Student",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": -10, "ENG": "eighty", "MAT": 90, "PHY": {"theory": "fifty", "practical": -5}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}}
+      },
+      {
+        "id": "M004",
+        "name": "Missing Required Fields Student",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": 80, "ENG": 70}
+      },
+      {
+        "id": "M005",
+        "name": "Unknown Subject Injection",
+        "class": "Class 10",
+        "optional": "HMT",
+        "marks": {"BAN": 80, "ENG": 75, "MAT": 90, "PHY": {"theory": 50, "practical": 20}, "CHE": {"theory": 60, "practical": 20}, "BIO": {"theory": 65, "practical": 20}, "HMT": {"theory": 70, "practical": 25}, "HACK": 100}
+      }
+    ]
+  };
+  document.getElementById('paste-ta').value = JSON.stringify(sample, null, 2);
+  validatePasted();
+}
+
+
+function validatePasted() {
+  const raw=document.getElementById('paste-ta').value.trim();
+  if(!raw){ toast('Nothing to validate','Paste a marks sheet into the box first.','warn'); return; }
+  let json;
+  try{ json=JSON.parse(raw); } catch(e){
+    document.getElementById('val-out').innerHTML =
+      `<div class="card"><div class="rej-hd">${icon('xcircle')}JSON syntax error</div>
+        <div class="rej-item"><div class="rej-r">${esc(e.message)}</div></div></div>`;
+    toast('That is not valid JSON', e.message, 'bad', 6000);
+    return;
+  }
+
+  let cases;
+  if(json.cases) cases=json.cases;
+  else if(json.students) cases=[json];
+  else if(Array.isArray(json)) cases=json;
+  else {
+    document.getElementById('val-out').innerHTML =
+      `<div class="card"><div class="rej-hd">${icon('alert')}Unrecognised structure</div>
+        <div class="rej-item"><div class="rej-r">Expected a case object with a "students" array, or a top-level object with a "cases" array.</div></div></div>`;
+    toast('Unrecognised structure','Expected "cases" or "students".','bad');
+    return;
+  }
+
+  const rejected=[], accepted=[];
+
+  for(const cobj of cases){
+    const cid=cobj.case_id||'Case';   // escaped at render
+    const sm={};
+    if(cobj.subjects) for(const s of cobj.subjects) sm[s.code]=s;
+    const comp=cobj.compulsory||[];
+    const studs=cobj.students||[];
+
+    for(const stu of studs){
+      const sid=stu.id||'?';           // escaped at render
+      const sname=stu.name||'Unknown'; // escaped at render
+      const errs=[];
+
+      // Security check: prototype pollution attempt
+      if(stu.__proto__ !== Object.prototype) errs.push("Security Alert: Prototype pollution key detected");
+      if(!stu.id) errs.push("Missing 'id'");
+      if(!stu.name) errs.push("Missing 'name'");
+      if(!stu.class) errs.push("Missing 'class'");
+      if(!stu.optional) errs.push("Missing 'optional'");
+
+      // Sanitization notice if HTML characters detected in fields
+      if(stu.name && /[<>]/.test(stu.name)) errs.push("Malicious input warning: HTML/Script tags detected in 'name' (Sanitized/Escaped)");
+      if(stu.class && /[<>]/.test(stu.class)) errs.push("Malicious input warning: HTML/Script tags detected in 'class' (Sanitized/Escaped)");
+
+      if(!stu.marks){ errs.push("Missing 'marks'"); }
+      else {
+        for(const [code,mark] of Object.entries(stu.marks)){
+          if(code === 'hacked' || code === 'HACK' || !(code in sm)) {
+            errs.push(`Unknown/Unrecognized subject code '${escapeHTML(code)}'`);
+            continue;
+          }
+          if(mark==='AB') continue;
+          const meta=sm[code];
+          if(meta?.practical){
+            if(typeof mark!=='object'||mark===null)
+              errs.push(`${code}: expected object {theory, practical}, got ${escapeHTML(JSON.stringify(mark))}`);
+            else{
+              if(typeof mark.theory !== 'number') errs.push(`${code}: theory mark must be a number (got ${escapeHTML(JSON.stringify(mark.theory))})`);
+else if(mark.theory<0||mark.theory>75) errs.push(`${esc(code)}: theory mark ${esc(mark.theory)} out of valid range 0–75`);
+              
+              if(typeof mark.practical !== 'number') errs.push(`${code}: practical mark must be a number (got ${escapeHTML(JSON.stringify(mark.practical))})`);
+              else if(mark.practical<0||mark.practical>25) errs.push(`${esc(code)}: practical mark ${esc(mark.practical)} out of valid range 0–25`);
+            }
+          } else {
+            if(typeof mark!=='number') errs.push(`${code}: expected numeric mark, got ${escapeHTML(JSON.stringify(mark))}`);
+            else if(mark<0||mark>100) errs.push(`${esc(code)}: total mark ${esc(mark)} out of valid range 0–100`);
+
+          }
+        }
+        if(stu.optional&&!(stu.optional in stu.marks))
+          errs.push(`Optional subject '${escapeHTML(stu.optional)}' has no mark entry`);
+        for(const code of comp)
+          if(!(code in stu.marks)) errs.push(`Missing mark for compulsory subject '${escapeHTML(code)}'`);
+      }
+
+      if(errs.length) rejected.push({id:`${cid}/${sid}`,name:sname,errs});
+      else accepted.push(`${cid}/${sid}`);
+    }
+  }
+
+  if(!rejected.length){
+    document.getElementById('val-out').innerHTML = `
+      <div class="card"><div class="ok-box">
+        <div class="ok-ic">${icon('check','ico-lg')}</div>
+        <h4>All ${accepted.length} rows valid</h4>
+        <p>No malformed marks found. This file is safe to process.</p>
+        <button class="btn btn-pri" onclick="processPasted()">${icon('arrow-right')}Process this file now</button>
+      </div></div>`;
+    toast('File is valid', `${accepted.length} student rows passed every check.`, 'ok');
+  } else {
+<<<<<<< HEAD
+    document.getElementById('val-out').innerHTML=`
+      <div class="rej-list">
+        <div class="rej-hdr">⛔ ${rejected.length} row${rejected.length>1?'s':''} rejected · ${accepted.length} accepted</div>
+        ${rejected.map(r=>`<div class="rej-item">
+<div><span class="ri-id">${esc(r.id)}</span> · ${esc(r.name)}</div>
+
+          ${r.errs.map(e=>`<div class="ri-r">→ ${e}</div>`).join('')}
+        </div>`).join('')}
+=======
+    document.getElementById('val-out').innerHTML = `
+      <div class="card">
+        <div class="rej-hd">${icon('xcircle')}
+          ${rejected.length} row${rejected.length>1?'s':''} rejected · ${accepted.length} accepted</div>
+        <div style="max-height:520px;overflow-y:auto;">
+          ${rejected.map(r=>`<div class="rej-item">
+            <div class="rej-top"><span class="rej-id">${esc(r.id)}</span>
+              <span>${esc(r.name)}</span>
+              <span class="chip c-bad">${r.errs.length} problem${r.errs.length>1?'s':''}</span></div>
+            ${r.errs.map(e=>`<div class="rej-r">${e}</div>`).join('')}
+          </div>`).join('')}
+        </div>
+>>>>>>> origin/master
+      </div>`;
+    toast(`${rejected.length} row${rejected.length>1?'s':''} rejected`,
+          'Each rejection lists the exact reason.', 'bad');
+  }
+}
+
+<<<<<<< HEAD
+/* ─── PRINT MARKSHEET ─── */
+function openPrintSelector() {
+  const c=CC();
+  document.getElementById('plist').innerHTML=c.processed.map(s=>`
+<div class="ck-item" data-sid="${esc(s.id)}" onclick="printStudent(this.dataset.sid)">
+      <div class="ck-id">${esc(s.id)}</div>
+      <div class="ck-info">
+        <div class="ck-name">${esc(s.name)}</div>
+        <div class="ck-why">${esc(s.class)} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div>
+
+      </div>
+    </div>`).join('');
+  document.getElementById('p-modal').classList.add('open');
+}
+
+function filterPrintList(q) {
+  const c=CC();
+  const ql=q.toLowerCase();
+  document.getElementById('plist').innerHTML=c.processed
+    .filter(s=>s.name.toLowerCase().includes(ql)||s.id.toLowerCase().includes(ql))
+.map(s=>`<div class="ck-item" data-sid="${esc(s.id)}" onclick="printStudent(this.dataset.sid)">
+      <div class="ck-id">${esc(s.id)}</div>
+      <div class="ck-info"><div class="ck-name">${esc(s.name)}</div><div class="ck-why">${esc(s.class)} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div></div>
+
+    </div>`).join('');
+=======
+
+/* Import the pasted file straight from the validator once it passes. */
+function processPasted(){
+  const raw = document.getElementById('paste-ta').value.trim();
+  if(!raw) return;
+  try { initApp(JSON.parse(raw), 'the pasted file'); }
+  catch(err){ toast('Invalid JSON', err.message, 'bad'); }
+>>>>>>> origin/master
+}
+
+function printStudent(id) {
+  document.getElementById('p-modal').classList.remove('open');
+  const c=CC();
+  const s=c.processed.find(st=>st.id===id);
+  if(!s) return;
+
+  const rows=[...c.compulsory,s.optional].map(code=>{
+    const meta=c.subjectMap[code];
+    const r=s.subjectResults[code];
+    const isComp=c.compulsory.includes(code);
+    if(!r) return '';
+    let markStr,gpStr,noteStr='';
+    if(r.absent){ markStr='AB'; gpStr='0.0'; noteStr='Absent'; }
+    else if(meta?.practical){
+      markStr=`${r.total}/100 (T:${r.theory}/75, P:${r.practical}/25)`;
+      gpStr=r.gp.toFixed(1);
+      if(r.fail) noteStr=r.failReason;
+    } else {
+      markStr=`${r.total}/100`;
+      gpStr=r.gp.toFixed(1);
+      if(r.fail) noteStr='Failed (mark < 33)';
+    }
+    return`<tr>
+<td style="border:1px solid #ccc;padding:6px 8px;">${esc(code)}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;">${esc(meta?.name||code)}</td>
+
+      <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${isComp?'Compulsory':'Optional'}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${markStr}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;font-weight:bold;">${gpStr}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;font-size:10px;color:${r.fail?'red':'#555'};">${noteStr}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('print-area').innerHTML=`
+    <div style="padding:15mm;font-family:'Times New Roman',serif;max-width:210mm;margin:0 auto;color:#000;">
+      <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:14px;">
+        <div style="font-size:22pt;font-weight:bold;">Bogura Secondary School</div>
+        <div style="font-size:12pt;margin:3px 0;">Official Student Academic Marksheet</div>
+<div style="font-size:10pt;color:#555;">Case Reference: ${esc(c.case_id||'N/A')} · SSC Result Engine</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11pt;">
+        <tr><td style="padding:4px 0;width:50%;"><b>Student Name:</b> ${esc(s.name)}</td><td><b>Student ID:</b> ${esc(s.id)}</td></tr>
+        <tr><td style="padding:4px 0;"><b>Class:</b> ${esc(s.class)}</td><td><b>Optional Subject:</b> ${esc(c.subjectMap[s.optional]?.name||s.optional)}</td></tr>
+
+      </table>
+      <table style="width:100%;border-collapse:collapse;font-size:10pt;">
+        <thead>
+          <tr style="background:#f0f0f0;">
+            <th style="border:1px solid #ccc;padding:7px 8px;text-align:left;">Code</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;text-align:left;">Subject</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">Type</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">Marks</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">GP</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">Note</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <table style="width:100%;margin-top:16px;border-collapse:collapse;font-size:11pt;border:1px solid #ccc;">
+        <tr>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Compulsory Sum:</b> ${s.compSum.toFixed(1)} / 30.0</td>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Optional Bonus:</b> +${s.optContrib.toFixed(1)}</td>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Final GPA:</b> <span style="font-size:14pt;font-weight:bold;">${s.finalGPA.toFixed(2)}</span></td>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Letter Grade:</b> <span style="font-size:16pt;font-weight:bold;">${s.letterGrade}</span></td>
+        </tr>
+      </table>
+      ${s.compFail?`<p style="color:red;margin-top:12px;font-size:10pt;"><b>RESULT: FAIL</b> — Compulsory subject failure in: ${s.compFailCodes.map(code=>c.subjectMap[code]?.name||code).join(', ')}. Uncancelled average was ${s.uncancelledGPA.toFixed(2)} (Rule R-13).</p>`:''}
+      <div style="margin-top:45px;display:flex;justify-content:space-between;">
+        <div style="text-align:center;"><div style="border-top:1px solid #000;padding-top:4px;width:150px;font-size:10pt;">Class Teacher</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #000;padding-top:4px;width:150px;font-size:10pt;">Headmaster</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #000;padding-top:4px;width:150px;font-size:10pt;">Date</div></div>
+      </div>
+    </div>`;
+
+  window.print();
+}
+
+/* built-in dataset — 60 students, two classes, all four hard edges */
+const BUILTIN_CASE = {"case_id":"BUILT-IN-60","subjects":[{"code":"BAN","name":"Bangla","practical":false},{"code":"ENG","name":"English","practical":false},{"code":"MAT","name":"Mathematics","practical":false},{"code":"PHY","name":"Physics","practical":true},{"code":"CHE","name":"Chemistry","practical":true},{"code":"BIO","name":"Biology","practical":true},{"code":"HMT","name":"Higher Mathematics","practical":true},{"code":"AGR","name":"Agriculture","practical":true},{"code":"REL","name":"Religious Studies","practical":false}],"compulsory":["BAN","ENG","MAT","PHY","CHE","BIO"],"students":[{"id":"S001","name":"Jubayer Hossain","class":"Class 9","optional":"HMT","marks":{"BAN":48,"ENG":37,"MAT":55,"PHY":{"theory":36,"practical":8},"CHE":{"theory":34,"practical":14},"BIO":{"theory":35,"practical":14},"HMT":{"theory":30,"practical":12}}},{"id":"S002","name":"Jarin Begum","class":"Class 9","optional":"HMT","marks":{"BAN":69,"ENG":67,"MAT":71,"PHY":{"theory":50,"practical":18},"CHE":{"theory":50,"practical":15},"BIO":{"theory":51,"practical":17},"HMT":{"theory":38,"practical":15}}},{"id":"S003","name":"Priya Ahmed","class":"Class 9","optional":"HMT","marks":{"BAN":54,"ENG":57,"MAT":59,"PHY":{"theory":45,"practical":14},"CHE":{"theory":35,"practical":15},"BIO":{"theory":41,"practical":19},"HMT":{"theory":39,"practical":17}}},{"id":"S004","name":"Rifat Begum","class":"Class 9","optional":"AGR","marks":{"BAN":68,"ENG":52,"MAT":59,"PHY":{"theory":34,"practical":20},"CHE":{"theory":38,"practical":13},"BIO":{"theory":38,"practical":13},"AGR":{"theory":40,"practical":17}}},{"id":"S005","name":"Sanjida Ahmed","class":"Class 9","optional":"HMT","marks":{"BAN":61,"ENG":53,"MAT":68,"PHY":{"theory":40,"practical":13},"CHE":{"theory":41,"practical":13},"BIO":{"theory":49,"practical":15},"HMT":{"theory":44,"practical":13}}},{"id":"S006","name":"Rifat Mia","class":"Class 9","optional":"REL","marks":{"BAN":50,"ENG":69,"MAT":67,"PHY":{"theory":55,"practical":15},"CHE":{"theory":46,"practical":14},"BIO":{"theory":43,"practical":19},"REL":52}},{"id":"S007","name":"Tanvir Sarkar","class":"Class 9","optional":"REL","marks":{"BAN":40,"ENG":52,"MAT":41,"PHY":{"theory":40,"practical":10},"CHE":{"theory":26,"practical":13},"BIO":{"theory":29,"practical":12},"REL":42}},{"id":"S008","name":"Nusrat Chowdhury","class":"Class 9","optional":"HMT","marks":{"BAN":78,"ENG":97,"MAT":96,"PHY":{"theory":69,"practical":22},"CHE":{"theory":51,"practical":19},"BIO":{"theory":61,"practical":19},"HMT":{"theory":59,"practical":22}}},{"id":"S009","name":"Rumana Sarkar","class":"Class 9","optional":"REL","marks":{"BAN":67,"ENG":51,"MAT":64,"PHY":{"theory":52,"practical":19},"CHE":{"theory":36,"practical":14},"BIO":{"theory":34,"practical":18},"REL":67}},{"id":"S010","name":"Mitu Sheikh","class":"Class 9","optional":"REL","marks":{"BAN":64,"ENG":66,"MAT":67,"PHY":{"theory":39,"practical":19},"CHE":{"theory":48,"practical":18},"BIO":{"theory":43,"practical":17},"REL":50}},{"id":"S011","name":"Nadia Karim","class":"Class 9","optional":"REL","marks":{"BAN":51,"ENG":69,"MAT":65,"PHY":{"theory":50,"practical":20},"CHE":{"theory":47,"practical":13},"BIO":{"theory":45,"practical":17},"REL":68}},{"id":"S012","name":"Nayeem Uddin","class":"Class 9","optional":"AGR","marks":{"BAN":64,"ENG":51,"MAT":60,"PHY":{"theory":35,"practical":16},"CHE":{"theory":42,"practical":16},"BIO":{"theory":42,"practical":18},"AGR":{"theory":40,"practical":19}}},{"id":"S013","name":"Ruma Karim","class":"Class 9","optional":"REL","marks":{"BAN":42,"ENG":53,"MAT":46,"PHY":{"theory":26,"practical":10},"CHE":{"theory":28,"practical":9},"BIO":{"theory":40,"practical":10},"REL":37}},{"id":"S014","name":"Jubayer Chowdhury","class":"Class 9","optional":"REL","marks":{"BAN":68,"ENG":56,"MAT":66,"PHY":{"theory":44,"practical":13},"CHE":{"theory":35,"practical":19},"BIO":{"theory":40,"practical":13},"REL":61}},{"id":"S015","name":"Ashiq Mia","class":"Class 9","optional":"AGR","marks":{"BAN":54,"ENG":58,"MAT":54,"PHY":{"theory":39,"practical":19},"CHE":{"theory":49,"practical":14},"BIO":{"theory":49,"practical":16},"AGR":{"theory":45,"practical":16}}},{"id":"S016","name":"Sohel Rahman","class":"Class 9","optional":"REL","marks":{"BAN":50,"ENG":72,"MAT":60,"PHY":{"theory":44,"practical":15},"CHE":{"theory":51,"practical":20},"BIO":{"theory":41,"practical":18},"REL":72}},{"id":"S017","name":"Jarin Ahmed","class":"Class 9","optional":"REL","marks":{"BAN":41,"ENG":51,"MAT":44,"PHY":{"theory":35,"practical":9},"CHE":{"theory":30,"practical":10},"BIO":{"theory":32,"practical":8},"REL":42}},{"id":"S018","name":"Nusrat Rahman","class":"Class 9","optional":"AGR","marks":{"BAN":64,"ENG":73,"MAT":73,"PHY":{"theory":48,"practical":19},"CHE":{"theory":48,"practical":19},"BIO":{"theory":41,"practical":18},"AGR":{"theory":42,"practical":17}}},{"id":"S019","name":"Robiul Sultana","class":"Class 9","optional":"HMT","marks":{"BAN":59,"ENG":65,"MAT":72,"PHY":{"theory":40,"practical":16},"CHE":{"theory":52,"practical":16},"BIO":{"theory":45,"practical":18},"HMT":{"theory":34,"practical":17}}},{"id":"S020","name":"Sumaiya Rahman","class":"Class 9","optional":"HMT","marks":{"BAN":87,"ENG":80,"MAT":78,"PHY":{"theory":66,"practical":19},"CHE":{"theory":59,"practical":22},"BIO":{"theory":60,"practical":25},"HMT":{"theory":63,"practical":22}}},{"id":"S021","name":"Mim Begum","class":"Class 9","optional":"AGR","marks":{"BAN":71,"ENG":73,"MAT":50,"PHY":{"theory":52,"practical":20},"CHE":{"theory":39,"practical":15},"BIO":{"theory":52,"practical":17},"AGR":{"theory":46,"practical":17}}},{"id":"S022","name":"Afsana Sarkar","class":"Class 9","optional":"AGR","marks":{"BAN":37,"ENG":44,"MAT":36,"PHY":{"theory":38,"practical":8},"CHE":{"theory":26,"practical":12},"BIO":{"theory":37,"practical":8},"AGR":{"theory":38,"practical":10}}},{"id":"S023","name":"Sajid Bhuiyan","class":"Class 10","optional":"REL","marks":{"BAN":84,"ENG":73,"MAT":92,"PHY":{"theory":51,"practical":21},"CHE":{"theory":69,"practical":23},"BIO":{"theory":62,"practical":25},"REL":85}},{"id":"S024","name":"Lamia Molla","class":"Class 10","optional":"AGR","marks":{"BAN":52,"ENG":69,"MAT":63,"PHY":{"theory":53,"practical":19},"CHE":{"theory":39,"practical":13},"BIO":{"theory":49,"practical":20},"AGR":{"theory":37,"practical":15}}},{"id":"S025","name":"Tareq Hossain","class":"Class 10","optional":"REL","marks":{"BAN":70,"ENG":51,"MAT":56,"PHY":{"theory":35,"practical":14},"CHE":{"theory":49,"practical":18},"BIO":{"theory":39,"practical":16},"REL":66}},{"id":"S026","name":"Sharmin Haque","class":"Class 10","optional":"HMT","marks":{"BAN":81,"ENG":90,"MAT":95,"PHY":{"theory":57,"practical":22},"CHE":{"theory":67,"practical":19},"BIO":{"theory":74,"practical":20},"HMT":{"theory":62,"practical":19}}},{"id":"S027","name":"Lamia Khatun","class":"Class 10","optional":"AGR","marks":{"BAN":74,"ENG":65,"MAT":67,"PHY":{"theory":36,"practical":20},"CHE":{"theory":49,"practical":14},"BIO":{"theory":54,"practical":17},"AGR":{"theory":40,"practical":20}}},{"id":"S028","name":"Nayeem Talukder","class":"Class 10","optional":"HMT","marks":{"BAN":57,"ENG":52,"MAT":61,"PHY":{"theory":50,"practical":13},"CHE":{"theory":41,"practical":15},"BIO":{"theory":51,"practical":16},"HMT":{"theory":46,"practical":17}}},{"id":"S029","name":"Masud Chowdhury","class":"Class 10","optional":"REL","marks":{"BAN":42,"ENG":46,"MAT":35,"PHY":{"theory":31,"practical":12},"CHE":{"theory":28,"practical":13},"BIO":{"theory":34,"practical":9},"REL":48}},{"id":"S030","name":"Tanha Rahman","class":"Class 10","optional":"AGR","marks":{"BAN":98,"ENG":96,"MAT":78,"PHY":{"theory":66,"practical":19},"CHE":{"theory":68,"practical":23},"BIO":{"theory":73,"practical":25},"AGR":{"theory":63,"practical":25}}},{"id":"S031","name":"Nazmul Sarkar","class":"Class 10","optional":"AGR","marks":{"BAN":72,"ENG":64,"MAT":67,"PHY":{"theory":44,"practical":18},"CHE":{"theory":43,"practical":17},"BIO":{"theory":49,"practical":16},"AGR":{"theory":40,"practical":20}}},{"id":"S032","name":"Jarin Sultana","class":"Class 10","optional":"AGR","marks":{"BAN":93,"ENG":92,"MAT":84,"PHY":{"theory":65,"practical":25},"CHE":{"theory":56,"practical":21},"BIO":{"theory":61,"practical":19},"AGR":{"theory":72,"practical":23}}},{"id":"S033","name":"Sabbir Begum","class":"Class 10","optional":"HMT","marks":{"BAN":98,"ENG":98,"MAT":83,"PHY":{"theory":63,"practical":19},"CHE":{"theory":63,"practical":25},"BIO":{"theory":59,"practical":19},"HMT":{"theory":71,"practical":25}}},{"id":"S034","name":"Ishrat Bhuiyan","class":"Class 10","optional":"REL","marks":{"BAN":38,"ENG":45,"MAT":46,"PHY":{"theory":33,"practical":11},"CHE":{"theory":31,"practical":13},"BIO":{"theory":28,"practical":12},"REL":55}},{"id":"S035","name":"Shakib Begum","class":"Class 10","optional":"HMT","marks":{"BAN":64,"ENG":67,"MAT":62,"PHY":{"theory":49,"practical":19},"CHE":{"theory":48,"practical":14},"BIO":{"theory":51,"practical":18},"HMT":{"theory":50,"practical":20}}},{"id":"S036","name":"Nazmul Chowdhury","class":"Class 10","optional":"HMT","marks":{"BAN":63,"ENG":70,"MAT":65,"PHY":{"theory":40,"practical":19},"CHE":{"theory":47,"practical":18},"BIO":{"theory":45,"practical":13},"HMT":{"theory":37,"practical":16}}},{"id":"S037","name":"Mim Das","class":"Class 10","optional":"REL","marks":{"BAN":81,"ENG":95,"MAT":94,"PHY":{"theory":54,"practical":19},"CHE":{"theory":56,"practical":20},"BIO":{"theory":59,"practical":22},"REL":78}},{"id":"S038","name":"Rifat Molla","class":"Class 10","optional":"AGR","marks":{"BAN":38,"ENG":38,"MAT":46,"PHY":{"theory":30,"practical":9},"CHE":{"theory":27,"practical":14},"BIO":{"theory":32,"practical":14},"AGR":{"theory":40,"practical":14}}},{"id":"S039","name":"Jarin Chowdhury","class":"Class 10","optional":"HMT","marks":{"BAN":38,"ENG":45,"MAT":38,"PHY":{"theory":35,"practical":8},"CHE":{"theory":32,"practical":11},"BIO":{"theory":38,"practical":8},"HMT":{"theory":36,"practical":8}}},{"id":"S040","name":"Rakib Hossain","class":"Class 10","optional":"REL","marks":{"BAN":74,"ENG":88,"MAT":93,"PHY":{"theory":70,"practical":24},"CHE":{"theory":70,"practical":21},"BIO":{"theory":62,"practical":23},"REL":98}},{"id":"S041","name":"Zahid Das","class":"Class 10","optional":"HMT","marks":{"BAN":43,"ENG":37,"MAT":35,"PHY":{"theory":40,"practical":8},"CHE":{"theory":27,"practical":13},"BIO":{"theory":40,"practical":12},"HMT":{"theory":30,"practical":13}}},{"id":"S042","name":"Shakib Talukder","class":"Class 10","optional":"AGR","marks":{"BAN":66,"ENG":63,"MAT":72,"PHY":{"theory":34,"practical":20},"CHE":{"theory":55,"practical":20},"BIO":{"theory":42,"practical":15},"AGR":{"theory":43,"practical":19}}},{"id":"S043","name":"Sajid Haque","class":"Class 10","optional":"REL","marks":{"BAN":42,"ENG":46,"MAT":45,"PHY":{"theory":39,"practical":8},"CHE":{"theory":37,"practical":8},"BIO":{"theory":36,"practical":11},"REL":47}},{"id":"S044","name":"Sohel Begum","class":"Class 10","optional":"AGR","marks":{"BAN":97,"ENG":75,"MAT":75,"PHY":{"theory":74,"practical":21},"CHE":{"theory":55,"practical":21},"BIO":{"theory":50,"practical":25},"AGR":{"theory":74,"practical":20}}},{"id":"S045","name":"Lamia Islam","class":"Class 9","optional":"HMT","marks":{"BAN":74,"ENG":87,"MAT":25,"PHY":{"theory":63,"practical":20},"CHE":{"theory":73,"practical":22},"BIO":{"theory":69,"practical":24},"HMT":{"theory":61,"practical":25}}},{"id":"S046","name":"Fahim Haque","class":"Class 10","optional":"HMT","marks":{"BAN":75,"ENG":89,"MAT":98,"PHY":{"theory":68,"practical":6},"CHE":{"theory":53,"practical":21},"BIO":{"theory":67,"practical":22},"HMT":{"theory":54,"practical":22}}},{"id":"S047","name":"Hasib Haque","class":"Class 9","optional":"AGR","marks":{"BAN":59,"ENG":69,"MAT":63,"PHY":{"theory":52,"practical":20},"CHE":{"theory":38,"practical":14},"BIO":{"theory":35,"practical":15},"AGR":{"theory":28,"practical":12}}},{"id":"S048","name":"Afsana Chowdhury","class":"Class 10","optional":"REL","marks":{"BAN":60,"ENG":"AB","MAT":72,"PHY":{"theory":47,"practical":15},"CHE":{"theory":52,"practical":16},"BIO":{"theory":45,"practical":18},"REL":60}},{"id":"S049","name":"Sharmin Uddin","class":"Class 9","optional":"AGR","marks":{"BAN":90,"ENG":78,"MAT":28,"PHY":{"theory":55,"practical":20},"CHE":{"theory":74,"practical":22},"BIO":{"theory":60,"practical":21},"AGR":{"theory":61,"practical":21}}},{"id":"S050","name":"Arif Sheikh","class":"Class 10","optional":"REL","marks":{"BAN":87,"ENG":85,"MAT":83,"PHY":{"theory":63,"practical":7},"CHE":{"theory":71,"practical":23},"BIO":{"theory":68,"practical":25},"REL":81}},{"id":"S051","name":"Mitu Begum","class":"Class 9","optional":"HMT","marks":{"BAN":77,"ENG":75,"MAT":82,"PHY":{"theory":61,"practical":23},"CHE":{"theory":64,"practical":21},"BIO":{"theory":57,"practical":25},"HMT":"AB"}},{"id":"S052","name":"Rupa Ahmed","class":"Class 10","optional":"REL","marks":{"BAN":54,"ENG":71,"MAT":62,"PHY":{"theory":55,"practical":19},"CHE":{"theory":53,"practical":18},"BIO":"AB","REL":53}},{"id":"S053","name":"Rakib Sheikh","class":"Class 9","optional":"HMT","marks":{"BAN":54,"ENG":51,"MAT":56,"PHY":{"theory":43,"practical":13},"CHE":{"theory":35,"practical":18},"BIO":{"theory":40,"practical":19},"HMT":{"theory":42,"practical":19}}},{"id":"S054","name":"Tanha Begum","class":"Class 10","optional":"REL","marks":{"BAN":65,"ENG":56,"MAT":71,"PHY":{"theory":41,"practical":16},"CHE":{"theory":35,"practical":19},"BIO":{"theory":52,"practical":17},"REL":63}},{"id":"S055","name":"Mim Sultana","class":"Class 9","optional":"REL","marks":{"BAN":67,"ENG":62,"MAT":72,"PHY":{"theory":54,"practical":19},"CHE":{"theory":37,"practical":16},"BIO":{"theory":53,"practical":20},"REL":66}},{"id":"S056","name":"Priya Haque","class":"Class 10","optional":"HMT","marks":{"BAN":64,"ENG":74,"MAT":67,"PHY":{"theory":34,"practical":13},"CHE":{"theory":36,"practical":20},"BIO":{"theory":37,"practical":15},"HMT":{"theory":45,"practical":18}}},{"id":"S057","name":"Masud Begum","class":"Class 9","optional":"HMT","marks":{"BAN":52,"ENG":55,"MAT":63,"PHY":{"theory":53,"practical":19},"CHE":{"theory":53,"practical":13},"BIO":{"theory":46,"practical":19},"HMT":{"theory":43,"practical":19}}},{"id":"S058","name":"Tanvir Mia","class":"Class 10","optional":"HMT","marks":{"BAN":98,"ENG":77,"MAT":77,"PHY":{"theory":51,"practical":22},"CHE":{"theory":52,"practical":21},"BIO":{"theory":70,"practical":23},"HMT":{"theory":50,"practical":24}}},{"id":"S059","name":"Anika Molla","class":"Class 9","optional":"AGR","marks":{"BAN":38,"ENG":48,"MAT":46,"PHY":{"theory":35,"practical":8},"CHE":{"theory":26,"practical":8},"BIO":{"theory":29,"practical":8},"AGR":{"theory":27,"practical":9}}},{"id":"S060","name":"Farhana Ahmed","class":"Class 10","optional":"AGR","marks":{"BAN":68,"ENG":58,"MAT":64,"PHY":{"theory":41,"practical":16},"CHE":{"theory":42,"practical":19},"BIO":{"theory":37,"practical":16},"AGR":{"theory":39,"practical":13}}}]};
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  STUDENT TRACE MODAL — the core demo surface          ║
+   ╚═══════════════════════════════════════════════════════╝ */
+let currentStudent = null;
+
+function openModal(id){
+  const c = CC();
+  const s = c.processed.find(x=>x.id===id);
+  if(!s) return;
+  currentStudent = s;
+
+  document.getElementById('m-name').textContent = s.name;
+  document.getElementById('m-meta').textContent =
+    `${s.id} · ${s.class} · optional: ${c.subjectMap[s.optional]?.name || s.optional || 'none'}`;
+
+  const av = document.getElementById('m-av');
+  av.textContent = s.letterGrade;
+  av.style.background = s.compFail ? 'linear-gradient(140deg,#B91C1C,#EF4444)'
+    : s.letterGrade==='A+' ? 'linear-gradient(140deg,#15803D,#22C55E)'
+    : 'linear-gradient(140deg,var(--ac),#8B5CF6)';
+
+  /* headline flags */
+  const flags = [];
+  if(s.compFail){
+    const names = s.compFailCodes.map(x=>esc(c.subjectMap[x]?.name||x)).join(', ');
+    flags.push(`<span class="fp fp-bad">${icon('xcircle')}Compulsory failure — ${names}</span>`);
+  }
+  if(s.onPracList) flags.push(`<span class="fp fp-warn">${icon('zap')}Practical part below 8 (R-11)</span>`);
+  if(s.onAbList)   flags.push(`<span class="fp fp-ac">${icon('userx')}Absent mark recorded (R-12)</span>`);
+  if(s.onOptList)  flags.push(`<span class="fp fp-info">${icon('star')}Optional GP ${fmt.gp(s.optGP)} — adds +${fmt.gp(s.optContrib)} (R-13)</span>`);
+  if(s.onDataList) flags.push(`<span class="fp fp-bad">${icon('wrench')}${s.dataIssues.length} input problem${s.dataIssues.length===1?'':'s'}</span>`);
+  if(!s.compFail && s.rawGPA > 5.0) flags.push(`<span class="fp fp-info">${icon('info')}Raw ${fmt.gpa(s.rawGPA)} capped to 5.00 (R-13)</span>`);
+  if(!flags.length) flags.push(`<span class="fp fp-info">${icon('check')}No rule needed a manual check</span>`);
+
+  /* subject-by-subject trace */
+  const order = [...c.compulsory, s.optional].filter(Boolean);
+  const traceRows = order.map(code=>{
+    const r = s.subjectResults[code];
+    if(!r) return '';
+    const meta = c.subjectMap[code];
+    const isOpt = code === s.optional;
+
+    let mark, gp;
+    if(r.absent){
+      mark = Chip('AB','warn'); gp = `<span class="gp-zero">0.0</span>`;
+    } else if(r.dataError){
+      mark = Chip('unusable','bad'); gp = `<span class="gp-zero">0.0</span>`;
+    } else if(meta?.practical){
+      mark = `<span class="mark-txt">${r.theory}<span class="t-dimmer">/75</span> + ${r.practical}<span class="t-dimmer">/25</span></span>
+        <span class="gp-note">total ${r.total}/100</span>`;
+      gp = r.fail
+        ? `<span class="gp-zero">0.0</span><span class="gp-note">${fmt.gp(r.gpIfPassed)} if both parts had passed</span>`
+        : `<span class="gp-big">${fmt.gp(r.gp)}</span>`;
+    } else {
+      mark = `<span class="mark-txt">${r.total}<span class="t-dimmer">/100</span></span>`;
+      gp = r.fail ? `<span class="gp-zero">0.0</span>` : `<span class="gp-big">${fmt.gp(r.gp)}</span>`;
+    }
+
+    const cls = r.absent ? 'tr-warn' : (r.fail ? 'tr-bad' : (isOpt ? 'tr-opt' : ''));
+    return `<tr class="${cls}">
+      <td><span class="sub-code">${esc(code)}</span><span class="sub-name">${esc(meta?.name||code)}</span></td>
+      <td>${isOpt ? Chip('Optional','info','star') : `<span class="t-dimmer t-xs">Compulsory</span>`}</td>
+      <td>${mark}</td>
+      <td>${gp}</td>
+      <td><span class="rule-txt">${esc(r.rule)}</span></td>
+    </tr>`;
+  }).join('');
+
+  /* GPA arithmetic, shown step by step */
+  const compLines = c.compulsory.map(code=>{
+    const r = s.subjectResults[code];
+    const name = c.subjectMap[code]?.name || code;
+    const gp = r ? fmt.gp(r.gp) : '0.0';
+    const note = r?.absent ? ' ← ABSENT' : r?.fail ? ' ← FAIL' : '';
+    return `<div class="cl">${esc(name.padEnd(20,' '))}${gp.padStart(5,' ')}${note}</div>`;
+  }).join('');
+  const optName = c.subjectMap[s.optional]?.name || s.optional || 'none';
+
+  document.getElementById('m-body').innerHTML = `
+    <div class="verdict">
+      <div class="verdict-gpa">
+        <div class="t-label">Final GPA</div>
+        <div class="n${s.letterGrade==='F'?' f':''}">${fmt.gpa(s.finalGPA)}</div>
+        ${s.compFail?`<div class="raw">uncancelled average ${fmt.gpa(s.uncancelledGPA)}</div>`:''}
+      </div>
+      <div class="verdict-facts">
+        <div class="fact"><div class="t-label">Letter</div>
+          <div>${GradeBadge(s.letterGrade,'height:30px;min-width:38px;font-size:13px;')}</div></div>
+        <div class="fact"><div class="t-label">Compulsory sum</div>
+          <div class="fact-v">${fmt.gp(s.compSum)}</div></div>
+        <div class="fact"><div class="t-label">Optional bonus</div>
+          <div class="fact-v">+${fmt.gp(s.optContrib)}</div></div>
+      </div>
+      <div class="verdict-flags">${flags.join('')}</div>
+    </div>
+
+    <h3 class="t-label" style="margin-bottom:10px;">Subject trace · rule applied to every mark</h3>
+    <table class="trace-tbl">
+      <thead><tr><th>Subject</th><th>Type</th><th>Mark used</th><th>Grade point</th><th>Rule that decided it</th></tr></thead>
+      <tbody>${traceRows}</tbody>
+    </table>
+
+    <div class="calc">
+      <div class="t-label" style="font-family:var(--sans);margin-bottom:9px;">GPA calculation · R-13</div>
+      <div class="${s.compFail?'unc':''}">
+        ${compLines}
+        <div class="cl" style="color:var(--info);">${esc(('Optional ('+optName+')').padEnd(20,' '))}${('+'+fmt.gp(s.optContrib)).padStart(5,' ')}   max(0, ${fmt.gp(s.optGP)} − 2.0)</div>
+        <div class="cl tot">Sum + bonus = ${fmt.gp(s.compSum)} + ${fmt.gp(s.optContrib)} = ${fmt.gp(s.compSum+s.optContrib)}</div>
+        <div class="cl tot">Divide by 6 = ${s.rawGPA.toFixed(4)}</div>
+        <div class="cl tot">Cap at 5.00 = ${fmt.gpa(s.cappedGPA)}</div>
+      </div>
+      ${s.compFail?`<div class="cl err">R-13 override — compulsory failure in
+        ${esc(s.compFailCodes.map(x=>c.subjectMap[x]?.name||x).join(', '))}.
+        Final GPA is forced to 0.00 and the letter grade to F. The uncancelled average of
+        ${fmt.gpa(s.uncancelledGPA)} stays visible above so the office can see what was lost.</div>`:''}
+      ${s.onDataList?`<div class="cl err" style="color:var(--warn);">Input problems on this row:<br>${
+        s.dataIssues.map(i=>'• '+esc(i)).join('<br>')}</div>`:''}
+    </div>`;
+
+  openOverlay('s-modal');
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  VALIDATOR                                            ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function clearValidator(){
+  document.getElementById('paste-ta').value = '';
+  document.getElementById('val-out').innerHTML = valPlaceholder();
+}
+function valPlaceholder(){
+  return `<div class="card"><div class="card-bd">${
+    Empty('shield','No file checked yet','Paste a marks sheet on the left and run the validator. Rejected rows are listed with the exact reason.')
+  }</div></div>`;
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  PRINT                                                ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function printRow(s){
+  return `<button class="ck-item" data-sid="${esc(s.id)}" onclick="printStudent(this.dataset.sid)">
+    <span class="ck-item-id">${esc(s.id)}</span>
+    <span class="ck-item-b">
+      <span class="ck-item-n">${esc(s.name)} <span>${esc(s.class)}</span></span>
+      <span class="ck-item-w">GPA ${fmt.gpa(s.finalGPA)}</span>
+    </span>
+    ${GradeBadge(s.letterGrade,'min-width:26px;height:22px;font-size:10px;')}
+  </button>`;
+}
+function openPrintSelector(){
+  document.getElementById('plist').innerHTML = CC().processed.map(printRow).join('');
+  openOverlay('p-modal');
+}
+function filterPrintList(q){
+  const ql = q.toLowerCase();
+  const rows = CC().processed.filter(s=>
+    s.name.toLowerCase().includes(ql) || s.id.toLowerCase().includes(ql));
+  document.getElementById('plist').innerHTML = rows.length
+    ? rows.map(printRow).join('')
+    : Empty('search','No match','No student matches that search.');
+}
+function printCurrent(){ if(currentStudent) printStudent(currentStudent.id); }
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  STARTUP                                              ║
+   ╚═══════════════════════════════════════════════════════╝ */
+hydrateIcons();
+document.getElementById('brand-mark').innerHTML = icon('shield','ico');
+document.getElementById('load-mark').innerHTML  = icon('shield','ico-lg');
+document.getElementById('val-out').innerHTML    = valPlaceholder();
+
+function loadBuiltIn(){ initApp({cases:[BUILTIN_CASE]}, 'the built-in dataset'); }
+
+(async()=>{
+  const paths = ['./P08_school_results_public.json','./P08/P08_school_results_public.json'];
+  const isFile = location.protocol === 'file:';
+  if(!isFile){
+    for(const path of paths){
+      try{
+        const res = await fetch(path);
+        if(res.ok){ initApp(await res.json(), path.split('/').pop()); return; }
+      }catch(e){}
+    }
+  }
+<<<<<<< HEAD
+
+  // fetch() is blocked on file:// and the marks file was not found over http.
+  // Say so plainly instead of leaving a status line spinning forever.
+  setLoadStatus(isFileProtocol
+    ? 'Opened directly from disk, so the browser blocks reading the marks file automatically. Drop <code>P08_school_results_public.json</code> above, or use the built-in dataset.'
+    : 'No marks file found next to this page. Upload one above, or use the built-in dataset.',
+    'warn');
+  const btn = document.getElementById('btn-builtin');
+  if(btn) btn.style.display = 'flex';
+
+=======
+  setLoadStatus(isFile
+    ? 'Opened straight from disk, so the browser will not let the page read a marks file on its own. Drop <code>P08_school_results_public.json</code> above, or use the built-in dataset.'
+    : 'No marks file found next to this page. Upload one above, or use the built-in dataset.', 'warn');
+  document.getElementById('btn-builtin').style.display = 'inline-flex';
+>>>>>>> origin/master
+})();
+
+</script>
+</body>
+</html>

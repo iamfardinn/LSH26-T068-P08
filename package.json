@@ -1,0 +1,12 @@
+{
+  "name": "result-engine",
+  "version": "1.0.0",
+  "description": "Browser-based school result processing engine for SSC-style marksheets",
+  "main": "index.html",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}
