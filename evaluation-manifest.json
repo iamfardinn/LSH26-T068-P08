@@ -1,0 +1,34 @@
+{
+    "release_version": "2.1",
+    "team_id": "LSH26-T068",
+    "form_receipt_time": "set by the organizer from the Google Form",
+    "problems": [
+        {
+            "problem_id": "P08",
+            "repository_url": "https://github.com/iamfardinn/LSH26-T068-P08",
+            "live_url": "https://gpaengine.netlify.app/",
+            "commit_sha": "",
+            "loads_sample_data": "yes|no, and how (file upload | typed | seeded on start)",
+            "requirements": {
+                "R1": {
+                    "status": "complete|partial|not_attempted",
+                    "evidence": "Complete"
+                },
+                "R2": {
+                    "status": "complete|partial|not_attempted",
+                    "evidence": "Complete"
+                },
+                "R3": {
+                    "status": "complete|partial|not_attempted",
+                    "evidence": "Complete"
+                },
+                "R4": {
+                    "status": "complete|partial|not_attempted",
+                    "evidence": "Complete"
+                }
+            },
+            "known_limitations": [The grading behavior is determined by the rules implemented in the current index.html
+            ]
+        }
+    ]
+}
