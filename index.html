@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Result Processing & GPA Engine — Bogura Secondary School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   DESIGN TOKENS & BASE STYLES
+═══════════════════════════════════════════════ */
+:root {
+  --bg-base:       #080d18;
+  --bg-surface:    #0e1525;
+  --bg-card:       #141e30;
+  --bg-card-hover: #192438;
+  --border:        rgba(255,255,255,0.07);
+  --border-hi:     rgba(99,179,237,0.35);
+
+  --text-1: #edf2f7;
+  --text-2: #8fa3ba;
+  --text-3: #546476;
+
+  --cyan:   #06b6d4;
+  --blue:   #3b82f6;
+  --teal:   #14b8a6;
+  --green:  #10b981;
+  --amber:  #f59e0b;
+  --orange: #f97316;
+  --red:    #ef4444;
+  --purple: #8b5cf6;
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 22px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  --transition: 0.18s cubic-bezier(.4,0,.2,1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text-1);min-height:100vh;line-height:1.55;}
+
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg-surface);}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.25);}
+
+/* ═══════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════ */
+.hdr{
+  background:linear-gradient(135deg,#070e1e 0%,#0e1f3a 50%,#070e1e 100%);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  position:sticky;top:0;z-index:200;
+  backdrop-filter:blur(16px);
+}
+.hdr-in{max-width:1700px;margin:0 auto;display:flex;align-items:center;gap:16px;height:64px;}
+.logo{
+  width:40px;height:40px;border-radius:var(--r-md);flex-shrink:0;
+  background:linear-gradient(135deg,var(--cyan),var(--blue));
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  box-shadow: 0 0 15px rgba(6,182,212,0.3);
+}
+.hdr-title h1{font-size:15px;font-weight:700;letter-spacing:-.2px;}
+.hdr-title p{font-size:11px;color:var(--text-3);}
+.hdr-gap{flex:1;}
+.case-sel{display:flex;align-items:center;gap:8px;}
+.case-sel label{font-size:11px;color:var(--text-3);white-space:nowrap;}
+
+.sel{
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-1);
+  padding:6px 10px;border-radius:var(--r-sm);font-size:12px;cursor:pointer;outline:none;
+  transition:var(--transition);
+}
+.sel:hover{border-color:var(--border-hi);}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 14px;border-radius:var(--r-sm);
+  font-size:12px;font-weight:500;cursor:pointer;border:none;transition:var(--transition);
+}
+.btn-pri{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff;}
+.btn-pri:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 12px rgba(6,182,212,0.3);}
+.btn-ghost{background:var(--bg-card);color:var(--text-2);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--bg-card-hover);color:var(--text-1);}
+
+/* ═══════════════════════════════════════════════
+   NAV TABS
+═══════════════════════════════════════════════ */
+.nav{background:var(--bg-surface);border-bottom:1px solid var(--border);padding:0 24px;}
+.nav-in{max-width:1700px;margin:0 auto;display:flex;gap:4px;}
+.tab-btn{
+  display:flex;align-items:center;gap:8px;padding:12px 18px;
+  font-size:13px;font-weight:500;color:var(--text-3);cursor:pointer;
+  border:none;background:none;border-bottom:2px solid transparent;
+  transition:var(--transition);white-space:nowrap;
+}
+.tab-btn:hover{color:var(--text-2);}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+.tbadge{
+  background:var(--bg-card);color:var(--text-3);
+  font-size:10px;padding:2px 7px;border-radius:100px;font-weight:600;
+}
+.tab-btn.active .tbadge{background:rgba(6,182,212,.18);color:var(--cyan);}
+
+/* ═══════════════════════════════════════════════
+   LAYOUT & CONTAINERS
+═══════════════════════════════════════════════ */
+.wrap{flex:1;max-width:1700px;margin:0 auto;width:100%;padding:24px;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ═══════════════════════════════════════════════
+   LOAD SCREEN
+═══════════════════════════════════════════════ */
+#load-screen{
+  min-height:80vh;display:flex;align-items:center;justify-content:center;padding:24px;
+}
+.load-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:44px;max-width:520px;width:100%;text-align:center;
+  box-shadow:var(--shadow);
+}
+.load-card h2{font-size:22px;font-weight:700;margin-bottom:6px;}
+.load-card p{color:var(--text-2);font-size:13px;margin-bottom:28px;line-height:1.6;}
+.drop-zone{
+  border:2px dashed var(--border);border-radius:var(--r-lg);padding:36px;
+  cursor:pointer;transition:var(--transition);margin-bottom:16px;
+}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--cyan);background:rgba(6,182,212,.04);}
+.drop-zone .dz-icon{font-size:42px;margin-bottom:10px;}
+.drop-zone h3{font-size:14px;font-weight:600;margin-bottom:5px;}
+.drop-zone p{font-size:11px;color:var(--text-3);}
+#file-input{display:none;}
+
+/* ═══════════════════════════════════════════════
+   STAT CARDS
+═══════════════════════════════════════════════ */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px;}
+.stat-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:20px;transition:var(--transition);position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--ca,var(--blue));
+}
+.stat-card:hover{background:var(--bg-card-hover);transform:translateY(-2px);}
+.s-icon{font-size:24px;margin-bottom:10px;}
+.s-val{font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:3px;}
+.s-lbl{font-size:11px;color:var(--text-3);font-weight:500;}
+
+/* ═══════════════════════════════════════════════
+   TABLES
+═══════════════════════════════════════════════ */
+.tbl-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.tbl-bar{
+  display:flex;align-items:center;gap:12px;padding:16px 20px;
+  border-bottom:1px solid var(--border);flex-wrap:wrap;
+}
+.tbl-bar h2{font-size:15px;font-weight:600;flex:1;min-width:140px;}
+.si{
+  background:var(--bg-surface);border:1px solid var(--border);color:var(--text-1);
+  padding:8px 14px;border-radius:var(--r-sm);font-size:12px;outline:none;
+}
+.si::placeholder{color:var(--text-3);}
+.si:focus{border-color:var(--border-hi);}
+.si-w{width:220px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead th{
+  padding:11px 16px;text-align:left;font-size:10px;font-weight:700;
+  color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;
+  background:var(--bg-surface);border-bottom:1px solid var(--border);
+  cursor:pointer;white-space:nowrap;user-select:none;
+}
+thead th:hover{color:var(--text-1);}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.035);cursor:pointer;transition:var(--transition);}
+tbody tr:hover{background:var(--bg-card-hover);}
+tbody tr:last-child{border-bottom:none;}
+tbody td{padding:12px 16px;white-space:nowrap;}
+
+/* ═══════════════════════════════════════════════
+   GRADE BADGES & TAGS
+═══════════════════════════════════════════════ */
+.gb{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:32px;height:32px;padding:0 8px;
+  border-radius:var(--r-sm);font-size:11px;font-weight:700;
+  font-family:'JetBrains Mono',monospace;
+}
+.gA\\+{background:rgba(16,185,129,.18);color:#10b981;border:1px solid rgba(16,185,129,.3);}
+.gA{background:rgba(20,184,166,.18);color:#14b8a6;border:1px solid rgba(20,184,166,.3);}
+.gA-{background:rgba(6,182,212,.18);color:#06b6d4;border:1px solid rgba(6,182,212,.3);}
+.gB{background:rgba(59,130,246,.18);color:#3b82f6;border:1px solid rgba(59,130,246,.3);}
+.gC{background:rgba(139,92,246,.18);color:#8b5cf6;border:1px solid rgba(139,92,246,.3);}
+.gD{background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.3);}
+.gF{background:rgba(239,68,68,.18);color:#ef4444;border:1px solid rgba(239,68,68,.3);}
+
+.tag{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600;}
+.t-fail{background:rgba(239,68,68,.15);color:#ef4444;}
+.t-warn{background:rgba(245,158,11,.15);color:#f59e0b;}
+.t-info{background:rgba(6,182,212,.15);color:#06b6d4;}
+.t-ok{background:rgba(16,185,129,.15);color:#10b981;}
+
+.gpa-n{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;}
+
+/* ═══════════════════════════════════════════════
+   MODAL (PER STUDENT TRACE)
+═══════════════════════════════════════════════ */
+.overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.75);z-index:1000;
+  backdrop-filter:blur(6px);
+  align-items:flex-start;justify-content:center;
+  padding:24px;overflow-y:auto;
+}
+.overlay.open{display:flex;}
+.modal{
+  background:var(--bg-surface);border:1px solid var(--border);
+  border-radius:var(--r-xl);width:100%;max-width:920px;
+  box-shadow:0 16px 64px rgba(0,0,0,.8);
+  animation:mIn .22s ease;margin:auto;
+}
+@keyframes mIn{from{opacity:0;transform:translateY(-12px) scale(.98);}to{opacity:1;transform:none;}}
+.modal-hdr{
+  display:flex;align-items:flex-start;gap:16px;
+  padding:24px;border-bottom:1px solid var(--border);
+}
+.m-avatar{
+  width:48px;height:48px;border-radius:var(--r-md);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+}
+.m-title h2{font-size:18px;font-weight:700;}
+.m-title p{font-size:12px;color:var(--text-2);margin-top:2px;}
+.m-gap{flex:1;}
+.m-close{
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-2);
+  width:32px;height:32px;border-radius:var(--r-sm);cursor:pointer;
+  font-size:14px;display:flex;align-items:center;justify-content:center;transition:var(--transition);
+}
+.m-close:hover{color:var(--text-1);border-color:var(--border-hi);}
+.modal-body{padding:24px;}
+
+.res-hl{
+  display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;
+  padding:20px;background:var(--bg-card);border-radius:var(--r-lg);
+  border:1px solid var(--border);align-items:center;
+}
+.res-gpa{font-size:42px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-2px;flex-shrink:0;}
+.res-det{min-width:90px;}
+.res-det .lbl{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;}
+.res-det .val{font-size:14px;font-weight:600;margin-top:3px;}
+.res-flags{display:flex;flex-direction:column;gap:6px;margin-left:auto;}
+.fp{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:100px;font-size:11px;font-weight:600;}
+.fp-fail{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);}
+.fp-warn{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);}
+.fp-info{background:rgba(6,182,212,.15);color:#06b6d4;border:1px solid rgba(6,182,212,.3);}
+.fp-ok{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);}
+
+.tr-tbl{width:100%;border-collapse:collapse;font-size:12px;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;}
+.tr-tbl th{background:var(--bg-card);padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;}
+.tr-tbl td{padding:10px 14px;border-top:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.tr-tbl tbody tr:hover{background:rgba(255,255,255,.02);}
+.tr-fail td:first-child{border-left:3px solid var(--red);}
+.tr-fail{background:rgba(239,68,68,.05)!important;}
+.tr-ab td:first-child{border-left:3px solid var(--amber);}
+.tr-ab{background:rgba(245,158,11,.05)!important;}
+.tr-opt td:first-child{border-left:3px solid var(--cyan);}
+.tr-opt{background:rgba(6,182,212,.03)!important;}
+.t-code{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--cyan);}
+.t-rule{font-size:11px;color:var(--text-2);line-height:1.4;}
+.t-mark{font-family:'JetBrains Mono',monospace;font-size:12px;}
+
+.calc-box{
+  margin-top:16px;background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:16px;
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;
+}
+.calc-box .c-lbl{font-family:'Inter',sans-serif;font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;font-weight:700;}
+.cl{margin:3px 0;color:var(--text-2);}
+.cl.tot{border-top:1px solid var(--border);padding-top:8px;margin-top:8px;font-weight:700;color:var(--text-1);}
+.cl.unc{color:var(--text-3);text-decoration:line-through;}
+.cl.err{color:var(--red);margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-family:'Inter',sans-serif;}
+
+/* ═══════════════════════════════════════════════
+   CHECKING LISTS
+═══════════════════════════════════════════════ */
+.ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:20px;}
+.ck-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.ck-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.ck-hdr h3{font-size:14px;font-weight:600;flex:1;}
+.ck-cnt{background:var(--bg-surface);padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;color:var(--text-2);}
+.ck-body{max-height:460px;overflow-y:auto;}
+.ck-item{
+  display:flex;align-items:flex-start;gap:12px;padding:12px 20px;
+  border-bottom:1px solid rgba(255,255,255,.035);cursor:pointer;transition:var(--transition);
+}
+.ck-item:hover{background:var(--bg-card-hover);}
+.ck-item:last-child{border-bottom:none;}
+.ck-id{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);width:48px;flex-shrink:0;padding-top:2px;}
+.ck-info{flex:1;}
+.ck-name{font-size:13px;font-weight:500;margin-bottom:2px;}
+.ck-why{font-size:11px;color:var(--text-3);}
+
+/* ═══════════════════════════════════════════════
+   SUMMARY / CHARTS
+═══════════════════════════════════════════════ */
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:20px;}
+.chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;}
+.chart-card h3{font-size:14px;font-weight:600;margin-bottom:20px;}
+.bar-chart{display:flex;flex-direction:column;gap:10px;}
+.bar-row{display:flex;align-items:center;gap:10px;}
+.bar-lbl{font-size:11px;width:28px;text-align:right;font-weight:700;}
+.bar-track{flex:1;background:var(--bg-surface);border-radius:100px;height:20px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:100px;transition:width .6s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;padding-left:8px;font-size:10px;font-weight:700;color:#fff;min-width:2px;}
+.bar-cnt{font-size:11px;width:34px;color:var(--text-3);font-family:'JetBrains Mono',monospace;}
+.donut-wrap{display:flex;align-items:center;gap:24px;}
+.donut-svg{width:120px;height:120px;flex-shrink:0;}
+.dl{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;}
+.dd{width:10px;height:10px;border-radius:50%;}
+.sf-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.sf-name{font-size:12px;width:100px;color:var(--text-2);flex-shrink:0;}
+.sf-track{flex:1;background:var(--bg-surface);border-radius:100px;height:16px;overflow:hidden;}
+.sf-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--red),var(--orange));display:flex;align-items:center;padding-left:8px;font-size:9px;font-weight:700;color:#fff;}
+.sf-cnt{font-size:11px;width:30px;color:var(--text-3);font-family:'JetBrains Mono',monospace;}
+
+/* ═══════════════════════════════════════════════
+   UPLOAD/VALIDATE TAB
+═══════════════════════════════════════════════ */
+.up-wrap{max-width:860px;}
+.up-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;margin-bottom:20px;}
+.up-card h3{font-size:14px;font-weight:600;margin-bottom:16px;}
+.paste-ta{
+  background:var(--bg-surface);border:1px solid var(--border);color:var(--text-1);
+  width:100%;height:160px;border-radius:var(--r-md);padding:14px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;resize:vertical;outline:none;
+}
+.paste-ta:focus{border-color:var(--border-hi);}
+.rej-list{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+.rej-hdr{padding:14px 20px;background:rgba(239,68,68,.08);border-bottom:1px solid var(--border);font-size:14px;font-weight:700;color:var(--red);}
+.rej-item{padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.035);font-size:12px;}
+.rej-item:last-child{border-bottom:none;}
+.ri-id{font-family:'JetBrains Mono',monospace;color:var(--amber);font-weight:600;}
+.ri-r{color:var(--text-2);margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:11px;}
+
+/* ═══════════════════════════════════════════════
+   SECTION HEADERS & NOTICES
+═══════════════════════════════════════════════ */
+.sec-hdr{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px;}
+.sec-hdr h2{font-size:18px;font-weight:700;}
+.sec-hdr p{font-size:12px;color:var(--text-2);margin-top:2px;}
+.notice{
+  background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.2);
+  border-radius:var(--r-md);padding:12px 16px;font-size:12px;color:var(--text-2);margin-bottom:20px;
+  line-height:1.5;
+}
+.notice strong{color:var(--cyan);}
+.empty{padding:40px;text-align:center;color:var(--text-3);}
+.empty .ei{font-size:40px;margin-bottom:12px;}
+
+/* ═══════════════════════════════════════════════
+   PRINT STYLES
+═══════════════════════════════════════════════ */
+#print-area{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #print-area,#print-area *{visibility:visible;}
+  #print-area{display:block!important;position:absolute;top:0;left:0;width:100%;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="logo">🏫</div>
+    <div class="hdr-title">
+      <h1>School Result Processing &amp; GPA Engine</h1>
+      <p>Bogura Secondary School · SSC Grading Rules R-10/R-11/R-12/R-13/R-29</p>
+    </div>
+    <div class="hdr-gap"></div>
+    <div class="case-sel" id="cs-wrap" style="display:none;">
+      <label for="cs-sel">Test Case:</label>
+      <select class="sel" id="cs-sel"></select>
+    </div>
+    <button class="btn btn-ghost" id="btn-load" style="display:none;" onclick="resetApp()">📂 Load New File</button>
+    <button class="btn btn-ghost" id="btn-print" style="display:none;" onclick="openPrintSelector()">🖨️ Print Marksheet</button>
+  </div>
+</header>
+
+<!-- ══════════════ NAV ══════════════ -->
+<nav class="nav" id="nav" style="display:none;">
+  <div class="nav-in">
+    <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab-btn" data-tab="students" onclick="switchTab('students')">
+      👥 Students <span class="tbadge" id="bdg-s">0</span>
+    </button>
+    <button class="tab-btn" data-tab="checking" onclick="switchTab('checking')">
+      ✅ Checking Lists <span class="tbadge" id="bdg-c">0</span>
+    </button>
+    <button class="tab-btn" data-tab="summary" onclick="switchTab('summary')">📈 Class Summary</button>
+    <button class="tab-btn" data-tab="upload" onclick="switchTab('upload')">📤 Validate Marks</button>
+  </div>
+</nav>
+
+<!-- ══════════════ LOAD SCREEN ══════════════ -->
+<div id="load-screen">
+  <div class="load-card">
+    <div style="font-size:54px;margin-bottom:14px;">🎓</div>
+    <h2>Load Marks Sheet</h2>
+    <p>Upload <code style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;font-size:11px;">P08_school_results_public.json</code> or any compatible marks file. The engine will process all cases and produce fully-traced results.</p>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="dz-icon">📄</div>
+      <h3>Drop file here or click to browse</h3>
+      <p>Accepts .json files following the P08 schema</p>
+    </div>
+    <input type="file" id="file-input" accept=".json" onchange="handleFile(event)">
+    <button class="btn btn-pri" style="width:100%;justify-content:center;font-size:13px;padding:10px;" onclick="document.getElementById('file-input').click()">
+      📂 Browse for File
+    </button>
+    <p style="margin-top:14px;font-size:11px;color:var(--text-3);">Attempting auto-load from workspace directory…</p>
+  </div>
+</div>
+
+<!-- ══════════════ APP MAIN ══════════════ -->
+<div id="app" style="display:none;">
+  <div class="wrap">
+
+    <!-- TAB 1: DASHBOARD -->
+    <div class="tab-panel active" id="tab-dashboard">
+      <div class="stats-grid" id="stats-grid"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;" id="dash-charts"></div>
+    </div>
+
+    <!-- TAB 2: STUDENTS -->
+    <div class="tab-panel" id="tab-students">
+      <div class="tbl-wrap">
+        <div class="tbl-bar">
+          <h2>Student Results</h2>
+          <input type="text" class="si si-w" id="q-search" placeholder="🔍 Search name / ID…" oninput="filterStudents()">
+          <select class="si sel" id="q-class" onchange="filterStudents()">
+            <option value="">All Classes</option>
+          </select>
+          <select class="si sel" id="q-result" onchange="filterStudents()">
+            <option value="">All Results</option>
+            <option value="PASS">Pass Only</option>
+            <option value="FAIL">Fail Only</option>
+          </select>
+          <select class="si sel" id="q-grade" onchange="filterStudents()">
+            <option value="">All Grades</option>
+            <option>A+</option><option>A</option><option>A-</option>
+            <option>B</option><option>C</option><option>D</option><option>F</option>
+          </select>
+          <select class="si sel" id="q-flag" onchange="filterStudents()">
+            <option value="">All Students</option>
+            <option value="absent">Has AB</option>
+            <option value="prac">Practical Fail</option>
+            <option value="opt">Optional ≤ 2.0</option>
+          </select>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="stbl">
+            <thead>
+              <tr>
+                <th onclick="sortBy('id')">ID ↕</th>
+                <th onclick="sortBy('name')">Name ↕</th>
+                <th onclick="sortBy('class')">Class ↕</th>
+                <th>Opt.</th>
+                <th>BAN</th><th>ENG</th><th>MAT</th>
+                <th>PHY</th><th>CHE</th><th>BIO</th>
+                <th>Opt.Subj.</th>
+                <th onclick="sortBy('finalGPA')">GPA ↕</th>
+                <th>Grade</th>
+                <th>Flags</th>
+              </tr>
+            </thead>
+            <tbody id="stbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: CHECKING LISTS -->
+    <div class="tab-panel" id="tab-checking">
+      <div class="sec-hdr"><div><h2>Office Checking Lists</h2><p>Students whose results require manual verification before publishing</p></div></div>
+      <div class="notice"><strong>R-29:</strong> A student can appear on more than one list. All three lists must be verified by a teacher before publishing results.</div>
+      <div class="ck-grid" id="ck-grid"></div>
+    </div>
+
+    <!-- TAB 4: CLASS SUMMARY -->
+    <div class="tab-panel" id="tab-summary">
+      <div class="sec-hdr"><div><h2>Class Summary</h2><p>Pass rates, grade distribution and subject-level failure analysis</p></div></div>
+      <div class="sum-grid" id="sum-grid"></div>
+    </div>
+
+    <!-- TAB 5: VALIDATE -->
+    <div class="tab-panel" id="tab-upload">
+      <div class="up-wrap">
+        <div class="sec-hdr"><div><h2>Validate Marks Sheet</h2><p>Paste or upload a JSON marks sheet to check for row rejections and exact reasons</p></div></div>
+        <div class="up-card">
+          <h3>Paste JSON</h3>
+          <textarea class="paste-ta" id="paste-ta" placeholder='Paste case JSON here…&#10;Supports single case {"students":[…]} or full file {"cases":[…]}'></textarea>
+          <div style="display:flex;gap:10px;margin-top:12px;">
+            <button class="btn btn-pri" onclick="validatePasted()">🔍 Validate Marks</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('paste-ta').value='';document.getElementById('val-out').innerHTML=''">Clear</button>
+          </div>
+        </div>
+        <div id="val-out"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ STUDENT DETAIL MODAL ══════════════ -->
+<div class="overlay" id="s-modal" onclick="closeOverlay('s-modal',event)">
+  <div class="modal" id="s-modal-box">
+    <div class="modal-hdr">
+      <div class="m-avatar" id="m-av">👤</div>
+      <div class="m-title"><h2 id="m-name"></h2><p id="m-meta"></p></div>
+      <div class="m-gap"></div>
+      <button class="btn btn-ghost" style="font-size:12px;" onclick="printCurrent()">🖨️ Print Marksheet</button>
+      <button class="m-close" onclick="document.getElementById('s-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<!-- ══════════════ PRINT SELECTOR MODAL ══════════════ -->
+<div class="overlay" id="p-modal" onclick="closeOverlay('p-modal',event)">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-hdr">
+      <div class="m-title"><h2>🖨️ Print Individual Marksheet</h2><p>Select a student</p></div>
+      <button class="m-close" onclick="document.getElementById('p-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" class="si" style="width:100%;margin-bottom:12px;" placeholder="Search name or ID…" oninput="filterPrintList(this.value)">
+      <div id="plist" style="max-height:420px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PRINTABLE AREA -->
+<div id="print-area"></div>
+
+<script>
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  RULES ENGINE                                         ║
+   ╚═══════════════════════════════════════════════════════╝ */
+
+function markToGP(total) {
+  if (total >= 80) return 5.0;
+  if (total >= 70) return 4.0;
+  if (total >= 60) return 3.5;
+  if (total >= 50) return 3.0;
+  if (total >= 40) return 2.0;
+  if (total >= 33) return 1.0;
+  return 0.0;
+}
+
+function gpToLetter(gpa) {
+  if (gpa >= 5.00) return "A+";
+  if (gpa >= 4.00) return "A";
+  if (gpa >= 3.50) return "A-";
+  if (gpa >= 3.00) return "B";
+  if (gpa >= 2.00) return "C";
+  if (gpa >= 1.00) return "D";
+  return "F";
+}
+
+function gpRange(total) {
+  if (total >= 80) return "80–100 → GP 5.0";
+  if (total >= 70) return "70–79 → GP 4.0";
+  if (total >= 60) return "60–69 → GP 3.5";
+  if (total >= 50) return "50–59 → GP 3.0";
+  if (total >= 40) return "40–49 → GP 2.0";
+  if (total >= 33) return "33–39 → GP 1.0";
+  return "< 33 → GP 0.0 (Fail)";
+}
+
+/**
+ * Process a single subject mark.
+ */
+function processSubject(code, mark, meta, isOptional) {
+  const subjectType = isOptional ? "optional" : "compulsory";
+
+  // ABSENT (R-12)
+  if (mark === "AB") {
+    return {
+      code, absent: true, gp: 0,
+      total: null, theory: null, practical: null,
+      fail: true, practicalFail: false, theoryFail: false,
+      failReason: "Absent (AB)",
+      rule: `R-12: Absent in ${subjectType} subject → GP 0.0${isOptional ? '; contributes 0 to GPA' : '; overall result = F'}`
+    };
+  }
+
+  // PRACTICAL SUBJECT (R-11)
+  if (meta && meta.practical) {
+    const T = mark.theory;
+    const P = mark.practical;
+    const total = T + P;
+    const tFail = T < 25;
+    const pFail = P < 8;
+
+    if (tFail || pFail) {
+      const gpIfPassed = markToGP(total);
+      let failReason = [];
+      if (tFail) failReason.push(`theory ${T}/75 < 25`);
+      if (pFail)  failReason.push(`practical ${P}/25 < 8`);
+      return {
+        code, absent: false, gp: 0,
+        total, theory: T, practical: P,
+        fail: true, practicalFail: pFail, theoryFail: tFail,
+        gpIfPassed,
+        failReason: failReason.join(' AND '),
+        rule: `R-11: Both parts must pass independently. Failed ${failReason.join('; ')} → GP 0.0 (total mark ${total} would give GP ${gpIfPassed.toFixed(1)} if passed)`
+      };
+    }
+
+    const gp = markToGP(total);
+    return {
+      code, absent: false, gp,
+      total, theory: T, practical: P,
+      fail: false, practicalFail: false, theoryFail: false,
+      rule: `R-11+R-10: theory ${T}/75 ✓ (≥25), practical ${P}/25 ✓ (≥8); total mark ${total} → ${gpRange(total)}`
+    };
+  }
+
+  // THEORY-ONLY SUBJECT (R-10)
+  const total = mark;
+  const gp = markToGP(total);
+  return {
+    code, absent: false, gp,
+    total, theory: null, practical: null,
+    fail: gp === 0,
+    practicalFail: false, theoryFail: false,
+    rule: `R-10: mark ${total}/100 → ${gpRange(total)}`
+  };
+}
+
+/**
+ * Process a single student through all grading rules.
+ */
+function processStudent(student, subjectMap, compulsory) {
+  const optCode = student.optional;
+  const subjectResults = {};
+
+  for (const [code, mark] of Object.entries(student.marks)) {
+    const meta = subjectMap[code] || { code, name: code, practical: false };
+    subjectResults[code] = processSubject(code, mark, meta, code === optCode);
+  }
+
+  // Compulsory sum and failure detection
+  let compSum = 0;
+  let compFail = false;
+  const compFailCodes = [];
+
+  for (const code of compulsory) {
+    const r = subjectResults[code];
+    if (!r) { compFail = true; compFailCodes.push(code); continue; }
+    compSum += r.gp;
+    if (r.fail || r.absent) { compFail = true; compFailCodes.push(code); }
+  }
+
+  // Optional contribution (R-13)
+  const optR = subjectResults[optCode];
+  const optGP = optR ? optR.gp : 0;
+  const optContrib = Math.max(0, optGP - 2.0);
+
+  // GPA calculation (R-13)
+  const rawGPA = (compSum + optContrib) / 6;
+  const cappedGPA = Math.min(5.0, rawGPA);
+  const uncancelledGPA = parseFloat(cappedGPA.toFixed(2));
+
+  let finalGPA, letterGrade;
+  if (compFail) {
+    finalGPA = 0.00;
+    letterGrade = "F";
+  } else {
+    finalGPA = uncancelledGPA;
+    letterGrade = gpToLetter(finalGPA);
+  }
+
+  // Checking list flags (R-29)
+  const onOptList  = optGP <= 2.0;
+  const onPracList = Object.values(subjectResults).some(r => r.practicalFail);
+  const onAbList   = Object.values(subjectResults).some(r => r.absent);
+
+  return {
+    ...student,
+    subjectResults,
+    compSum, compFail, compFailCodes,
+    optGP, optContrib,
+    rawGPA, cappedGPA, uncancelledGPA,
+    finalGPA, letterGrade,
+    onOptList, onPracList, onAbList
+  };
+}
+
+function processCase(caseData) {
+  const subjectMap = {};
+  for (const s of caseData.subjects) subjectMap[s.code] = s;
+  const processed = caseData.students.map(s =>
+    processStudent(s, subjectMap, caseData.compulsory)
+  );
+  return { ...caseData, subjectMap, processed };
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  APP STATE & UI                                       ║
+   ╚═══════════════════════════════════════════════════════╝ */
+const APP = {
+  cases: [],
+  idx: 0,
+  filtered: [],
+  sortField: 'id',
+  sortDir: 1
+};
+
+function CC() { return APP.cases[APP.idx]; }
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  FILE HANDLING & INITIALIZATION                       ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function handleFile(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try { initApp(JSON.parse(ev.target.result)); }
+    catch(err) { alert("JSON parse error: " + err.message); }
+  };
+  r.readAsText(f);
+}
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    const r = new FileReader();
+    r.onload = ev => { try{initApp(JSON.parse(ev.target.result));}catch(err){alert(err.message);} };
+    r.readAsText(f);
+  }
+});
+
+function initApp(json) {
+  let cases;
+  if (json.cases) cases = json.cases;
+  else if (json.students) cases = [json];
+  else { alert("Unrecognized JSON format. Needs 'cases' array or single case object with 'students'."); return; }
+
+  APP.cases = cases.map(processCase);
+  APP.idx = 0;
+
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('nav').style.display = 'block';
+  document.getElementById('btn-load').style.display = 'flex';
+  document.getElementById('btn-print').style.display = 'flex';
+
+  const cw = document.getElementById('cs-wrap');
+  const cs = document.getElementById('cs-sel');
+  if (APP.cases.length > 1) {
+    cw.style.display = 'flex';
+    cs.innerHTML = APP.cases.map((c,i) =>
+      `<option value="${i}">${c.case_id||'Case '+(i+1)} (${c.students.length} students)</option>`
+    ).join('');
+    cs.onchange = () => { APP.idx = +cs.value; renderAll(); };
+  } else {
+    cw.style.display = 'none';
+  }
+
+  renderAll();
+  switchTab('dashboard');
+}
+
+function resetApp() {
+  document.getElementById('load-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('nav').style.display = 'none';
+  document.getElementById('cs-wrap').style.display = 'none';
+  document.getElementById('btn-load').style.display = 'none';
+  document.getElementById('btn-print').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+/* ╔═══════════════════════════════════════════════════════╗
+   ║  RENDERING VIEWS                                      ║
+   ╚═══════════════════════════════════════════════════════╝ */
+function renderAll() {
+  renderDash();
+  renderStudents();
+  renderChecking();
+  renderSummary();
+  updateBadges();
+}
+
+/* ─── DASHBOARD ─── */
+function renderDash() {
+  const c = CC();
+  const students = c.processed;
+  const total = students.length;
+  const passed = students.filter(s => s.letterGrade !== 'F').length;
+  const failed = total - passed;
+  const passRate = total ? ((passed/total)*100).toFixed(1) : '0.0';
+  const gpas = students.filter(s=>s.letterGrade!=='F').map(s=>s.finalGPA);
+  const avgGPA = gpas.length ? (gpas.reduce((a,b)=>a+b,0)/gpas.length).toFixed(2) : '0.00';
+  const aPlus = students.filter(s=>s.letterGrade==='A+').length;
+  const needsChk = students.filter(s=>s.onOptList||s.onPracList||s.onAbList).length;
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card" style="--ca:var(--cyan);">
+      <div class="s-icon">👥</div><div class="s-val">${total}</div><div class="s-lbl">Total Students</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--green);">
+      <div class="s-icon">✅</div><div class="s-val" style="color:var(--green);">${passed}</div><div class="s-lbl">Passed · ${passRate}%</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--red);">
+      <div class="s-icon">❌</div><div class="s-val" style="color:var(--red);">${failed}</div><div class="s-lbl">Failed</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--teal);">
+      <div class="s-icon">📊</div><div class="s-val" style="color:var(--teal);">${avgGPA}</div><div class="s-lbl">Avg GPA (Passed)</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--green);">
+      <div class="s-icon">🏆</div><div class="s-val" style="color:var(--green);">${aPlus}</div><div class="s-lbl">A+ Students</div>
+    </div>
+    <div class="stat-card" style="--ca:var(--amber);">
+      <div class="s-icon">⚠️</div><div class="s-val" style="color:var(--amber);">${needsChk}</div><div class="s-lbl">Needs Verification</div>
+    </div>
+  `;
+
+  // Grade Distribution
+  const GC = {'A+':'#10b981','A':'#14b8a6','A-':'#06b6d4','B':'#3b82f6','C':'#8b5cf6','D':'#f59e0b','F':'#ef4444'};
+  const grades = ['A+','A','A-','B','C','D','F'];
+  const gcnt = Object.fromEntries(grades.map(g=>[g,0]));
+  students.forEach(s=>{const g=s.letterGrade;gcnt[g]=(gcnt[g]||0)+1;});
+  const mxG = Math.max(...Object.values(gcnt),1);
+
+  const gradeChart = grades.map(g=>{
+    const n=gcnt[g]; const pct=((n/mxG)*100).toFixed(1);
+    return `<div class="bar-row">
+      <div class="bar-lbl" style="color:${GC[g]};">${g}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${GC[g]};">${n&&pct>15?n:''}</div></div>
+      <div class="bar-cnt">${n}</div>
+    </div>`;
+  }).join('');
+
+  // Failures by Subject
+  const sf = {};
+  c.subjects.forEach(s=>{sf[s.code]={name:s.name,n:0};});
+  students.forEach(s=>{
+    Object.entries(s.subjectResults).forEach(([code,r])=>{
+      if((r.fail||r.absent)&&sf[code]) sf[code].n++;
+    });
+  });
+  const sfArr = Object.values(sf).sort((a,b)=>b.n-a.n).filter(x=>x.n>0);
+  const mxF = sfArr[0]?.n||1;
+  const worstSubj = sfArr[0] ? `${sfArr[0].name} (${sfArr[0].n} fails)` : 'None';
+
+  const failChart = sfArr.length ? sfArr.map(({name,n})=>{
+    const bw=((n/mxF)*100).toFixed(1);
+    const pct=((n/total)*100).toFixed(0);
+    return `<div class="sf-row">
+      <div class="sf-name">${name}</div>
+      <div class="sf-track"><div class="sf-fill" style="width:${bw}%;">${bw>20?`${n} (${pct}%)`:''}</div></div>
+      <div class="sf-cnt">${n}</div>
+    </div>`;
+  }).join('') : '<div class="empty"><div class="ei">🎉</div><p>No subject failures recorded!</p></div>';
+
+  document.getElementById('dash-charts').innerHTML = `
+    <div class="chart-card">
+      <h3>📊 Grade Distribution</h3>
+      <div class="bar-chart">${gradeChart}</div>
+    </div>
+    <div class="chart-card">
+      <h3>⚠️ Failures by Subject
+        <span style="font-size:11px;color:var(--text-3);font-weight:400;margin-left:6px;">Most: ${worstSubj}</span>
+      </h3>
+      ${failChart}
+    </div>
+  `;
+}
+
+/* ─── STUDENTS TABLE ─── */
+function renderStudents() {
+  const c = CC();
+  const classes = [...new Set(c.processed.map(s=>s.class))].sort();
+  const cf = document.getElementById('q-class');
+  cf.innerHTML = '<option value="">All Classes</option>' +
+    classes.map(cl=>`<option value="${cl}">${cl}</option>`).join('');
+  APP.filtered = [...c.processed];
+  APP.sortField='id'; APP.sortDir=1;
+  renderTable();
+}
+
+function filterStudents() {
+  const c=CC();
+  const q=document.getElementById('q-search').value.toLowerCase();
+  const cls=document.getElementById('q-class').value;
+  const res=document.getElementById('q-result').value;
+  const gr=document.getElementById('q-grade').value;
+  const fl=document.getElementById('q-flag').value;
+
+  APP.filtered = c.processed.filter(s=>{
+    if(q && !s.name.toLowerCase().includes(q) && !s.id.toLowerCase().includes(q)) return false;
+    if(cls && s.class!==cls) return false;
+    if(res==='PASS' && s.letterGrade==='F') return false;
+    if(res==='FAIL' && s.letterGrade!=='F') return false;
+    if(gr && s.letterGrade!==gr) return false;
+    if(fl==='absent' && !s.onAbList) return false;
+    if(fl==='prac' && !s.onPracList) return false;
+    if(fl==='opt' && !s.onOptList) return false;
+    return true;
+  });
+  renderTable();
+}
+
+function sortBy(field) {
+  if(APP.sortField===field) APP.sortDir*=-1; else{APP.sortField=field;APP.sortDir=1;}
+  APP.filtered.sort((a,b)=>{
+    let av=a[field],bv=b[field];
+    if(typeof av==='string'){av=av.toLowerCase();bv=bv.toLowerCase();}
+    return av<bv?-APP.sortDir:av>bv?APP.sortDir:0;
+  });
+  renderTable();
+}
+
+function gpCell(s,code) {
+  const r=s.subjectResults[code];
+  if(!r) return '<td style="color:var(--text-3);">—</td>';
+  if(r.absent) return '<td><span class="tag t-warn">AB</span></td>';
+  if(r.fail)   return `<td><span class="tag t-fail">${r.gp.toFixed(1)}</span></td>`;
+  return `<td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;">${r.gp.toFixed(1)}</span></td>`;
+}
+
+function renderTable() {
+  const tbody=document.getElementById('stbody');
+  if(!APP.filtered.length){
+    tbody.innerHTML=`<tr><td colspan="14"><div class="empty"><div class="ei">🔍</div><p>No students match selected filters</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML=APP.filtered.map(s=>{
+    const gCls = s.letterGrade==='A+'?'gA\\+':s.letterGrade==='A-'?'gA-':'g'+s.letterGrade;
+    const flags=[];
+    if(s.onAbList) flags.push('<span class="tag t-warn">AB</span>');
+    if(s.onPracList) flags.push('<span class="tag t-warn">P-FAIL</span>');
+    if(s.onOptList) flags.push('<span class="tag t-info">OPT≤2</span>');
+
+    const optR=s.subjectResults[s.optional];
+    let optCell='—';
+    if(optR){
+      if(optR.absent) optCell='<span class="tag t-warn">AB</span>';
+      else if(optR.fail) optCell=`<span class="tag t-fail">${optR.gp.toFixed(1)}</span>`;
+      else optCell=`<span style="font-family:'JetBrains Mono',monospace;font-size:11px;">${optR.gp.toFixed(1)}</span>`;
+    }
+
+    return `<tr onclick="openModal('${s.id}')">
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);">${s.id}</span></td>
+      <td><span style="font-weight:500;">${s.name}</span></td>
+      <td><span style="font-size:11px;color:var(--text-2);">${s.class}</span></td>
+      <td><span style="font-size:11px;color:var(--text-3);">${s.optional}</span></td>
+      ${gpCell(s,'BAN')}${gpCell(s,'ENG')}${gpCell(s,'MAT')}
+      ${gpCell(s,'PHY')}${gpCell(s,'CHE')}${gpCell(s,'BIO')}
+      <td>${optCell}</td>
+      <td>
+        <span class="gpa-n" style="${s.letterGrade==='F'?'color:var(--red);':''}">${s.finalGPA.toFixed(2)}</span>
+        ${s.compFail?`<br><span style="font-size:9px;color:var(--text-3);">raw:${s.uncancelledGPA.toFixed(2)}</span>`:''}
+      </td>
+      <td><span class="gb ${gCls}">${s.letterGrade}</span></td>
+      <td>${flags.join(' ')||'<span style="color:var(--text-3);font-size:11px;">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ─── STUDENT DETAIL MODAL & TRACE ─── */
+let currentStudent = null;
+
+function openModal(id) {
+  const c=CC();
+  const s=c.processed.find(st=>st.id===id);
+  if(!s) return;
+  currentStudent=s;
+
+  document.getElementById('m-name').textContent=s.name;
+  document.getElementById('m-meta').textContent=
+    `${s.id} · ${s.class} · Optional: ${c.subjectMap[s.optional]?.name||s.optional}`;
+
+  const av=document.getElementById('m-av');
+  av.style.background = s.compFail
+    ? 'linear-gradient(135deg,#7f1d1d,#dc2626)'
+    : s.letterGrade==='A+'
+      ? 'linear-gradient(135deg,#064e3b,#10b981)'
+      : 'linear-gradient(135deg,#1e3a5f,#3b82f6)';
+
+  // Flags
+  const flags=[];
+  if(s.compFail){
+    const names=s.compFailCodes.map(code=>c.subjectMap[code]?.name||code).join(', ');
+    flags.push(`<span class="fp fp-fail">❌ Compulsory subject failed: ${names}</span>`);
+  }
+  if(s.onPracList) flags.push(`<span class="fp fp-warn">⚡ Practical component failed (R-11)</span>`);
+  if(s.onAbList)   flags.push(`<span class="fp fp-warn">📋 Absent in subject (R-12)</span>`);
+  if(s.onOptList)  flags.push(`<span class="fp fp-info">ℹ️ Optional GP ${s.optGP.toFixed(1)} ≤ 2.0 — bonus +${s.optContrib.toFixed(1)} (R-13)</span>`);
+  if(!s.compFail&&s.rawGPA>5.00) flags.push(`<span class="fp fp-info">✨ GPA capped at 5.00 (R-13)</span>`);
+  if(!flags.length) flags.push(`<span class="fp fp-ok">✅ Clean result — all requirements met</span>`);
+
+  // Trace rows
+  const allCodes=[...c.compulsory, s.optional];
+  const traceRows=allCodes.map(code=>{
+    const meta=c.subjectMap[code];
+    const r=s.subjectResults[code];
+    const isOpt=code===s.optional;
+    if(!r) return '';
+
+    let markCell,gpCell;
+    if(r.absent){
+      markCell=`<span class="tag t-warn" style="font-size:11px;">AB</span>`;
+      gpCell=`<span class="tag t-fail">0.0</span>`;
+    } else if(meta?.practical){
+      markCell=`
+        <span class="t-mark">Theory: ${r.theory}/75 &nbsp; Practical: ${r.practical}/25</span>
+        <br><span style="font-size:10px;color:var(--text-3);">Total mark: ${r.total}/100</span>`;
+      gpCell=r.fail
+        ? `<span class="tag t-fail">0.0</span><br><span style="font-size:9px;color:var(--text-3);">would give ${r.gpIfPassed?.toFixed(1)} if passed</span>`
+        : `<span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--teal);">${r.gp.toFixed(1)}</span>`;
+    } else {
+      markCell=`<span class="t-mark">${r.total}/100</span>`;
+      gpCell=r.fail
+        ? `<span class="tag t-fail">0.0</span>`
+        : `<span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--teal);">${r.gp.toFixed(1)}</span>`;
+    }
+
+    const rowCls=r.absent?'tr-ab':r.fail?'tr-fail':isOpt?'tr-opt':'';
+    return `<tr class="${rowCls}">
+      <td>
+        <span class="t-code">${code}</span>
+        <br><span style="font-size:10px;color:var(--text-3);">${meta?.name||code}</span>
+      </td>
+      <td>${isOpt?'<span style="color:var(--cyan);font-size:11px;font-weight:600;">⭐ Optional</span>':'<span style="font-size:11px;color:var(--text-3);">✔ Compulsory</span>'}</td>
+      <td>${markCell}</td>
+      <td>${gpCell}</td>
+      <td><span class="t-rule">${r.rule}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Calculation trace
+  const compLines=c.compulsory.map(code=>{
+    const r=s.subjectResults[code];
+    const name=c.subjectMap[code]?.name||code;
+    const gp=r?r.gp.toFixed(1):'0.0';
+    const note=r?.absent?' ← <span style="color:var(--amber);">ABSENT</span>':r?.fail?' ← <span style="color:var(--red);">FAIL</span>':'';
+    return `<div class="cl">${name.padEnd(18,' ')} : ${gp.padStart(4,' ')}${note}</div>`;
+  }).join('');
+
+  const optName=c.subjectMap[s.optional]?.name||s.optional;
+  const gCls=s.letterGrade==='A+'?'gA\\+':s.letterGrade==='A-'?'gA-':'g'+s.letterGrade;
+
+  document.getElementById('m-body').innerHTML=`
+    <div class="res-hl">
+      <div>
+        <div class="res-gpa" style="${s.letterGrade==='F'?'color:var(--red);':''}">${s.finalGPA.toFixed(2)}</div>
+        ${s.compFail?`<div style="font-size:10px;color:var(--text-3);margin-top:2px;">Uncancelled avg: ${s.uncancelledGPA.toFixed(2)}</div>`:''}
+      </div>
+      <div class="res-det">
+        <div class="lbl">Letter Grade</div>
+        <div class="val"><span class="gb ${gCls}" style="min-width:auto;padding:4px 12px;font-size:14px;">${s.letterGrade}</span></div>
+      </div>
+      <div class="res-det">
+        <div class="lbl">Compulsory Sum</div>
+        <div class="val" style="font-family:'JetBrains Mono',monospace;">${s.compSum.toFixed(1)}</div>
+      </div>
+      <div class="res-det">
+        <div class="lbl">Optional Bonus</div>
+        <div class="val" style="font-family:'JetBrains Mono',monospace;">+${s.optContrib.toFixed(1)}</div>
+      </div>
+      <div class="res-flags">${flags.join('')}</div>
+    </div>
+
+    <h3 style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.6px;">Subject Audit Trace (R-10 · R-11 · R-12)</h3>
+    <table class="tr-tbl">
+      <thead>
+        <tr>
+          <th>Subject</th><th>Type</th><th>Mark Used</th><th>Grade Point</th><th>Rule Applied</th>
+        </tr>
+      </thead>
+      <tbody>${traceRows}</tbody>
+    </table>
+
+    <div class="calc-box">
+      <div class="c-lbl">GPA Calculation Trace (R-13)</div>
+      <div class="${s.compFail?'unc':''}">
+        ${compLines}
+        <div class="cl" style="color:var(--cyan);">
+          Optional bonus (${optName}) : +${s.optContrib.toFixed(1)} &nbsp;
+          [max(0, ${s.optGP.toFixed(1)} − 2.0) = ${s.optContrib.toFixed(1)}]
+        </div>
+        <div class="cl tot">Compulsory Sum + Bonus = ${s.compSum.toFixed(1)} + ${s.optContrib.toFixed(1)} = ${(s.compSum+s.optContrib).toFixed(1)}</div>
+        <div class="cl tot">Raw Average = ${(s.compSum+s.optContrib).toFixed(1)} / 6 = ${s.rawGPA.toFixed(6)}</div>
+        <div class="cl tot">Capped Average = min(5.00, ${s.rawGPA.toFixed(4)}) = ${s.cappedGPA.toFixed(2)}</div>
+      </div>
+      ${s.compFail?`<div class="cl err">❌ R-13 Override: Compulsory subject failure in [${s.compFailCodes.join(', ')}] → Final GPA forced to 0.00, Letter Grade = F. Uncancelled average of ${s.uncancelledGPA.toFixed(2)} is shown in audit trace for office review.</div>`:''}
+    </div>
+  `;
+
+  document.getElementById('s-modal').classList.add('open');
+}
+
+function closeOverlay(id,e){
+  if(e.target.id===id) document.getElementById(id).classList.remove('open');
+}
+
+/* ─── CHECKING LISTS ─── */
+function renderChecking() {
+  const c=CC();
+  const students=c.processed;
+
+  const optList=students.filter(s=>s.onOptList);
+  const pracList=students.filter(s=>s.onPracList);
+  const abList=students.filter(s=>s.onAbList);
+
+  function buildList(items, reasonFn) {
+    if(!items.length) return '<div class="empty"><div class="ei">✅</div><p>No students on this list</p></div>';
+    return items.map(s=>{
+      const gCls=s.letterGrade==='A+'?'gA\\+':s.letterGrade==='A-'?'gA-':'g'+s.letterGrade;
+      return `<div class="ck-item" onclick="openModal('${s.id}')">
+        <div class="ck-id">${s.id}</div>
+        <div class="ck-info">
+          <div class="ck-name">${s.name} <span style="font-size:11px;color:var(--text-3);">${s.class}</span></div>
+          <div class="ck-why">${reasonFn(s)}</div>
+        </div>
+        <span class="gb ${gCls}" style="font-size:10px;min-width:28px;height:28px;">${s.letterGrade}</span>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('ck-grid').innerHTML = `
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">⭐</span><h3>Optional Subject List</h3><div class="ck-cnt">${optList.length}</div></div>
+      <div class="ck-body">${buildList(optList,s=>{
+        const r=s.subjectResults[s.optional];
+        const name=CC().subjectMap[s.optional]?.name||s.optional;
+        return r?.absent?`${name}: Absent (AB) — contributes +0.00`:`${name}: GP ${s.optGP.toFixed(1)} ≤ 2.0 — bonus +0.00 (no benefit)`;
+      })}</div>
+    </div>
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">⚡</span><h3>Practical Fail List</h3><div class="ck-cnt">${pracList.length}</div></div>
+      <div class="ck-body">${buildList(pracList,s=>{
+        const fp=Object.entries(s.subjectResults)
+          .filter(([,r])=>r.practicalFail)
+          .map(([code,r])=>`${CC().subjectMap[code]?.name||code} (P: ${r.practical}/25 < 8)`);
+        return `Practical fail in: ${fp.join('; ')}`;
+      })}</div>
+    </div>
+    <div class="ck-card">
+      <div class="ck-hdr"><span style="font-size:18px;">📋</span><h3>Absent Students List</h3><div class="ck-cnt">${abList.length}</div></div>
+      <div class="ck-body">${buildList(abList,s=>{
+        const ab=Object.entries(s.subjectResults)
+          .filter(([,r])=>r.absent)
+          .map(([code])=>CC().subjectMap[code]?.name||code);
+        return `Absent mark (AB) in: ${ab.join(', ')}`;
+      })}</div>
+    </div>
+  `;
+}
+
+/* ─── CLASS SUMMARY ─── */
+function renderSummary() {
+  const c=CC();
+  const students=c.processed;
+  const classes=[...new Set(students.map(s=>s.class))].sort();
+  const GC={'A+':'#10b981','A':'#14b8a6','A-':'#06b6d4','B':'#3b82f6','C':'#8b5cf6','D':'#f59e0b','F':'#ef4444'};
+  const grades=['A+','A','A-','B','C','D','F'];
+
+  let html='';
+  for(const cls of['All',...classes]) {
+    const grp=cls==='All'?students:students.filter(s=>s.class===cls);
+    if(!grp.length) continue;
+    const total=grp.length;
+    const passed=grp.filter(s=>s.letterGrade!=='F').length;
+    const passRate=((passed/total)*100).toFixed(1);
+    const gcnt=Object.fromEntries(grades.map(g=>[g,0]));
+    grp.forEach(s=>{const g=s.letterGrade;gcnt[g]=(gcnt[g]||0)+1;});
+    const mxG=Math.max(...Object.values(gcnt),1);
+    const pct=((passed/total)*100).toFixed(1);
+
+    html+=`<div class="chart-card">
+      <h3>${cls==='All'?'🏫 Overall Performance':'📚 '+cls}
+        <span style="font-size:11px;font-weight:400;color:var(--text-3);margin-left:8px;">${total} students · ${passRate}% pass rate</span>
+      </h3>
+      <div class="donut-wrap" style="margin-bottom:20px;">
+        <svg class="donut-svg" viewBox="0 0 42 42">
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="#1a2236" stroke-width="4.5"/>
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="#10b981" stroke-width="4.5"
+            stroke-dasharray="${pct} 100"
+            stroke-dashoffset="25" transform="rotate(-90 21 21)" stroke-linecap="round"/>
+          <text x="21" y="21" text-anchor="middle" dominant-baseline="central"
+            fill="#edf2f7" font-size="6.5" font-weight="bold" font-family="JetBrains Mono">${pct}%</text>
+        </svg>
+        <div>
+          <div class="dl"><div class="dd" style="background:#10b981;"></div>Pass: <b>${passed}</b></div>
+          <div class="dl"><div class="dd" style="background:#ef4444;"></div>Fail: <b>${total-passed}</b></div>
+          <div class="dl"><div class="dd" style="background:#1a2236;border:1px solid rgba(255,255,255,.1);"></div>Total: <b>${total}</b></div>
+        </div>
+      </div>
+      <div class="bar-chart">
+        ${grades.map(g=>{const n=gcnt[g];const p=((n/mxG)*100).toFixed(1);
+          return`<div class="bar-row">
+            <div class="bar-lbl" style="color:${GC[g]};">${g}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${p}%;background:${GC[g]};">${n&&p>12?n:''}</div></div>
+            <div class="bar-cnt">${n}</div>
+          </div>`;}).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Subject Failure Analysis
+  const sf={};
+  c.subjects.forEach(s=>{sf[s.code]={name:s.name,n:0};});
+  students.forEach(s=>{
+    Object.entries(s.subjectResults).forEach(([code,r])=>{
+      if((r.fail||r.absent)&&sf[code]) sf[code].n++;
+    });
+  });
+  const sfArr=Object.values(sf).sort((a,b)=>b.n-a.n);
+  const mxF=sfArr[0]?.n||1;
+
+  html+=`<div class="chart-card" style="grid-column:1/-1;">
+    <h3>📉 Subject Failure Breakdown</h3>
+    ${sfArr.map(({name,n})=>{
+      const bw=((n/mxF)*100).toFixed(1);
+      const pct=((n/students.length)*100).toFixed(1);
+      return`<div class="sf-row">
+        <div class="sf-name">${name}</div>
+        <div class="sf-track"><div class="sf-fill" style="width:${bw}%;">${bw>18?`${n} (${pct}%)`:''}</div></div>
+        <div class="sf-cnt">${n}</div>
+      </div>`;}).join('')}
+  </div>`;
+
+  document.getElementById('sum-grid').innerHTML=html;
+}
+
+/* ─── BADGES ─── */
+function updateBadges() {
+  const c=CC();
+  document.getElementById('bdg-s').textContent=c.processed.length;
+  document.getElementById('bdg-c').textContent=
+    c.processed.filter(s=>s.onOptList||s.onPracList||s.onAbList).length;
+}
+
+/* ─── TAB NAVIGATION ─── */
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+}
+
+/* ─── VALIDATION / IMPORT ─── */
+function validatePasted() {
+  const raw=document.getElementById('paste-ta').value.trim();
+  if(!raw) return;
+  let json;
+  try{ json=JSON.parse(raw); } catch(e){
+    document.getElementById('val-out').innerHTML=
+      `<div class="rej-list"><div class="rej-hdr">⛔ JSON Syntax Error</div><div class="rej-item"><div class="ri-r">${e.message}</div></div></div>`;
+    return;
+  }
+
+  let cases;
+  if(json.cases) cases=json.cases;
+  else if(json.students) cases=[json];
+  else if(Array.isArray(json)) cases=json;
+  else {
+    document.getElementById('val-out').innerHTML=
+      `<div class="rej-list"><div class="rej-hdr">⛔ Unrecognized Structure</div><div class="rej-item"><div class="ri-r">Expected case object with 'students', or top-level object with 'cases'.</div></div></div>`;
+    return;
+  }
+
+  const rejected=[], accepted=[];
+
+  for(const cobj of cases){
+    const cid=cobj.case_id||'Case';
+    const sm={};
+    if(cobj.subjects) for(const s of cobj.subjects) sm[s.code]=s;
+    const comp=cobj.compulsory||[];
+    const studs=cobj.students||[];
+
+    for(const stu of studs){
+      const sid=stu.id||'?';
+      const sname=stu.name||'Unknown';
+      const errs=[];
+
+      if(!stu.id) errs.push("Missing 'id'");
+      if(!stu.name) errs.push("Missing 'name'");
+      if(!stu.class) errs.push("Missing 'class'");
+      if(!stu.optional) errs.push("Missing 'optional'");
+      if(!stu.marks){ errs.push("Missing 'marks'"); }
+      else {
+        for(const [code,mark] of Object.entries(stu.marks)){
+          if(mark==='AB') continue;
+          const meta=sm[code];
+          if(meta?.practical){
+            if(typeof mark!=='object'||mark===null)
+              errs.push(`${code}: expected object {theory, practical}, got ${JSON.stringify(mark)}`);
+            else{
+              if(mark.theory===undefined) errs.push(`${code}: missing theory mark`);
+              else if(mark.theory<0||mark.theory>75) errs.push(`${code}: theory mark ${mark.theory} out of range 0–75`);
+              if(mark.practical===undefined) errs.push(`${code}: missing practical mark`);
+              else if(mark.practical<0||mark.practical>25) errs.push(`${code}: practical mark ${mark.practical} out of range 0–25`);
+            }
+          } else {
+            if(typeof mark!=='number') errs.push(`${code}: expected numeric mark, got ${JSON.stringify(mark)}`);
+            else if(mark<0||mark>100) errs.push(`${code}: mark ${mark} out of range 0–100`);
+          }
+        }
+        if(stu.optional&&!(stu.optional in stu.marks))
+          errs.push(`Optional subject '${stu.optional}' has no mark entry`);
+        for(const code of comp)
+          if(!(code in stu.marks)) errs.push(`Missing mark for compulsory subject '${code}'`);
+      }
+
+      if(errs.length) rejected.push({id:`${cid}/${sid}`,name:sname,errs});
+      else accepted.push(`${cid}/${sid}`);
+    }
+  }
+
+  if(!rejected.length){
+    document.getElementById('val-out').innerHTML=`
+      <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);border-radius:var(--r-md);padding:24px;text-align:center;">
+        <div style="font-size:42px;margin-bottom:8px;">✅</div>
+        <div style="font-weight:700;color:var(--green);font-size:15px;">All ${accepted.length} student rows valid!</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px;">No validation errors found. Ready to process.</div>
+      </div>`;
+  } else {
+    document.getElementById('val-out').innerHTML=`
+      <div class="rej-list">
+        <div class="rej-hdr">⛔ ${rejected.length} row${rejected.length>1?'s':''} rejected · ${accepted.length} accepted</div>
+        ${rejected.map(r=>`<div class="rej-item">
+          <div><span class="ri-id">${r.id}</span> · ${r.name}</div>
+          ${r.errs.map(e=>`<div class="ri-r">→ ${e}</div>`).join('')}
+        </div>`).join('')}
+      </div>`;
+  }
+}
+
+/* ─── PRINT MARKSHEET ─── */
+function openPrintSelector() {
+  const c=CC();
+  document.getElementById('plist').innerHTML=c.processed.map(s=>`
+    <div class="ck-item" onclick="printStudent('${s.id}')">
+      <div class="ck-id">${s.id}</div>
+      <div class="ck-info">
+        <div class="ck-name">${s.name}</div>
+        <div class="ck-why">${s.class} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('p-modal').classList.add('open');
+}
+
+function filterPrintList(q) {
+  const c=CC();
+  const ql=q.toLowerCase();
+  document.getElementById('plist').innerHTML=c.processed
+    .filter(s=>s.name.toLowerCase().includes(ql)||s.id.toLowerCase().includes(ql))
+    .map(s=>`<div class="ck-item" onclick="printStudent('${s.id}')">
+      <div class="ck-id">${s.id}</div>
+      <div class="ck-info"><div class="ck-name">${s.name}</div><div class="ck-why">${s.class} · GPA ${s.finalGPA.toFixed(2)} · Grade ${s.letterGrade}</div></div>
+    </div>`).join('');
+}
+
+function printCurrent(){ if(currentStudent) printStudent(currentStudent.id); }
+
+function printStudent(id) {
+  document.getElementById('p-modal').classList.remove('open');
+  const c=CC();
+  const s=c.processed.find(st=>st.id===id);
+  if(!s) return;
+
+  const rows=[...c.compulsory,s.optional].map(code=>{
+    const meta=c.subjectMap[code];
+    const r=s.subjectResults[code];
+    const isComp=c.compulsory.includes(code);
+    if(!r) return '';
+    let markStr,gpStr,noteStr='';
+    if(r.absent){ markStr='AB'; gpStr='0.0'; noteStr='Absent'; }
+    else if(meta?.practical){
+      markStr=`${r.total}/100 (T:${r.theory}/75, P:${r.practical}/25)`;
+      gpStr=r.gp.toFixed(1);
+      if(r.fail) noteStr=r.failReason;
+    } else {
+      markStr=`${r.total}/100`;
+      gpStr=r.gp.toFixed(1);
+      if(r.fail) noteStr='Failed (mark < 33)';
+    }
+    return`<tr>
+      <td style="border:1px solid #ccc;padding:6px 8px;">${code}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;">${meta?.name||code}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${isComp?'Compulsory':'Optional'}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;">${markStr}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;text-align:center;font-weight:bold;">${gpStr}</td>
+      <td style="border:1px solid #ccc;padding:6px 8px;font-size:10px;color:${r.fail?'red':'#555'};">${noteStr}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('print-area').innerHTML=`
+    <div style="padding:15mm;font-family:'Times New Roman',serif;max-width:210mm;margin:0 auto;color:#000;">
+      <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:14px;">
+        <div style="font-size:22pt;font-weight:bold;">Bogura Secondary School</div>
+        <div style="font-size:12pt;margin:3px 0;">Official Student Academic Marksheet</div>
+        <div style="font-size:10pt;color:#555;">Case Reference: ${c.case_id||'N/A'} · SSC Result Engine</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11pt;">
+        <tr><td style="padding:4px 0;width:50%;"><b>Student Name:</b> ${s.name}</td><td><b>Student ID:</b> ${s.id}</td></tr>
+        <tr><td style="padding:4px 0;"><b>Class:</b> ${s.class}</td><td><b>Optional Subject:</b> ${c.subjectMap[s.optional]?.name||s.optional}</td></tr>
+      </table>
+      <table style="width:100%;border-collapse:collapse;font-size:10pt;">
+        <thead>
+          <tr style="background:#f0f0f0;">
+            <th style="border:1px solid #ccc;padding:7px 8px;text-align:left;">Code</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;text-align:left;">Subject</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">Type</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">Marks</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">GP</th>
+            <th style="border:1px solid #ccc;padding:7px 8px;">Note</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <table style="width:100%;margin-top:16px;border-collapse:collapse;font-size:11pt;border:1px solid #ccc;">
+        <tr>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Compulsory Sum:</b> ${s.compSum.toFixed(1)} / 30.0</td>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Optional Bonus:</b> +${s.optContrib.toFixed(1)}</td>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Final GPA:</b> <span style="font-size:14pt;font-weight:bold;">${s.finalGPA.toFixed(2)}</span></td>
+          <td style="border:1px solid #ccc;padding:8px 12px;"><b>Letter Grade:</b> <span style="font-size:16pt;font-weight:bold;">${s.letterGrade}</span></td>
+        </tr>
+      </table>
+      ${s.compFail?`<p style="color:red;margin-top:12px;font-size:10pt;"><b>RESULT: FAIL</b> — Compulsory subject failure in: ${s.compFailCodes.map(code=>c.subjectMap[code]?.name||code).join(', ')}. Uncancelled average was ${s.uncancelledGPA.toFixed(2)} (Rule R-13).</p>`:''}
+      <div style="margin-top:45px;display:flex;justify-content:space-between;">
+        <div style="text-align:center;"><div style="border-top:1px solid #000;padding-top:4px;width:150px;font-size:10pt;">Class Teacher</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #000;padding-top:4px;width:150px;font-size:10pt;">Headmaster</div></div>
+        <div style="text-align:center;"><div style="border-top:1px solid #000;padding-top:4px;width:150px;font-size:10pt;">Date</div></div>
+      </div>
+    </div>`;
+
+  window.print();
+}
+
+/* ─── AUTO-LOAD AT STARTUP ─── */
+(async()=>{
+  const paths = ['./P08_school_results_public.json', './P08/P08_school_results_public.json'];
+  for(const path of paths){
+    try{
+      const res = await fetch(path);
+      if(res.ok){
+        const j = await res.json();
+        initApp(j);
+        return;
+      }
+    }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>
