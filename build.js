@@ -18,7 +18,6 @@ const filesToCopy = [
   'evaluation-manifest.json',
   'README.md',
   'LICENSE.md',
-  'LICENSES.md',
   'EVENT.md'
 ];
 

@@ -28,7 +28,7 @@ A browser-based school result processing engine for SSC-style marksheets. The ap
 ├── P08_school_results_public.json
 ├── P08_edge_cases.json
 ├── README.md
-└── LICENSES.md
+└── LICENSE.md
 ```
 
 The application is intentionally implemented as a self-contained HTML file containing the UI, styling, validation, processing logic, and client-side rendering.
@@ -331,7 +331,7 @@ The interface uses:
 - **Inter**
 - **JetBrains Mono**
 
-The page loads these fonts through Google Fonts. See `LICENSES.md` for the third-party licensing notice.
+The page loads these fonts through Google Fonts. See `LICENSE.md` for the third-party licensing notice.
 
 ## Limitations
 
@@ -344,7 +344,7 @@ The page loads these fonts through Google Fonts. See `LICENSES.md` for the third
 
 ## License
 
-This project is released under the MIT License. See [`LICENSES.md`](LICENSES.md).
+This project is released under the MIT License. See [`LICENSE.md`](LICENSE.md).
 
 ## Disclaimer
 

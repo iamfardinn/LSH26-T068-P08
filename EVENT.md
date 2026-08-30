@@ -1,2 +1,19 @@
+# Event Start Record
 
-LSH26-8490-C900
+- **Team ID:** `LSH26-8490`
+- **Problem ID:** `P08`
+- **Repository:** `LSH26-T068-P08`
+- **Event start code:** `LSH26-8490-C900`
+- **Repository created before release:**  No
+
+## Material present before 6:00 PM
+
+List every scaffold, template, configuration, asset or file already present before the event started. Write `None` if the repository was empty.
+
+| Material | Source or original location | What was already present |
+|---|---|---|
+| None | N/A | Repository was empty |
+
+## Declaration
+
+This file was created in the first event-work commit. The team will preserve the repository history until results are announced.

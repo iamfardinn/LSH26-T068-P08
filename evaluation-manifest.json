@@ -27,7 +27,8 @@
                     "evidence": "Complete"
                 }
             },
-            "known_limitations": [The grading behavior is determined by the rules implemented in the current index.html
+            "known_limitations": [
+                "The grading behavior is determined by the rules implemented in the current index.html"
             ]
         }
     ]
